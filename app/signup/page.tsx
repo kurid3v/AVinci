@@ -7,6 +7,7 @@ import { useSession } from '@/context/SessionContext';
 import EyeIcon from '@/components/icons/EyeIcon';
 import EyeOffIcon from '@/components/icons/EyeOffIcon';
 import UserCircleIcon from '@/components/icons/UserCircleIcon';
+import QuestionMarkCircleIcon from '@/components/icons/QuestionMarkCircleIcon';
 
 export default function SignUpPage() {
   const [displayName, setDisplayName] = useState('');
@@ -19,6 +20,7 @@ export default function SignUpPage() {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const { signUp } = useSession();
@@ -77,7 +79,16 @@ export default function SignUpPage() {
   const inputClasses = "block w-full px-4 py-3 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/50";
 
   return (
-    <div className="min-h-screen bg-secondary flex items-center justify-center p-4">
+    <div className="min-h-screen bg-secondary flex items-center justify-center p-4 relative">
+       {/* Help Button */}
+       <button 
+        onClick={() => setShowGuide(true)}
+        className="absolute top-4 right-4 flex items-center gap-2 px-4 py-2 bg-white text-primary font-semibold rounded-full shadow-sm hover:bg-slate-50 transition-colors z-10"
+      >
+        <QuestionMarkCircleIcon className="h-5 w-5" />
+        <span className="hidden sm:inline">Hướng dẫn đăng ký</span>
+      </button>
+
       <div className="w-full max-w-md">
         <form onSubmit={handleSubmit} className="bg-card shadow-card rounded-xl border border-border p-8 space-y-6">
           <div className="text-center">
@@ -218,6 +229,52 @@ export default function SignUpPage() {
           </div>
         </form>
       </div>
+
+       {/* Guide Modal */}
+       {showGuide && (
+        <div 
+            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowGuide(false)}
+        >
+            <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+                <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                    <QuestionMarkCircleIcon className="text-blue-600" />
+                    Hướng dẫn đăng ký
+                </h3>
+                <div className="space-y-4 text-slate-600">
+                    <div>
+                        <p className="font-semibold text-slate-800">Quy tắc tên đăng nhập:</p>
+                        <p className="text-sm mt-1">Viết liền không dấu, không chứa ký tự đặc biệt.</p>
+                        <div className="flex gap-2 mt-1 text-sm font-mono bg-slate-100 p-2 rounded">
+                            <span className="text-green-600">✓ nguyenvana</span>
+                            <span className="text-red-500">✗ Nguyễn Văn A</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p className="font-semibold text-slate-800">Chọn vai trò:</p>
+                        <ul className="list-disc list-inside text-sm mt-1 ml-1 space-y-1">
+                            <li><span className="font-bold">Học sinh:</span> Để làm bài tập, bài thi và xem điểm.</li>
+                            <li><span className="font-bold">Giáo viên:</span> Để tạo lớp học, ra đề thi và quản lý học sinh.</li>
+                        </ul>
+                    </div>
+                    
+                    <div>
+                        <p className="font-semibold text-slate-800">Bảo mật:</p>
+                        <p className="text-sm mt-1">Mật khẩu cần ít nhất 6 ký tự. Hãy ghi nhớ tên đăng nhập và mật khẩu của bạn.</p>
+                    </div>
+                </div>
+                <div className="mt-6 text-center">
+                    <button 
+                        onClick={() => setShowGuide(false)}
+                        className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg transition-colors"
+                    >
+                        Đã hiểu
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 };

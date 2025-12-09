@@ -9,6 +9,7 @@ import LockClosedIcon from '@/components/icons/LockClosedIcon';
 import TrashIcon from '@/components/icons/TrashIcon';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import ClipboardListIcon from '@/components/icons/ClipboardListIcon';
+import QuestionMarkCircleIcon from '@/components/icons/QuestionMarkCircleIcon';
 
 interface ExamsViewProps {
     initialExams: Exam[];
@@ -20,6 +21,7 @@ interface ExamsViewProps {
 export default function ExamsView({ initialExams, problems, currentUser, classrooms }: ExamsViewProps) {
   const router = useRouter();
   const [examToDelete, setExamToDelete] = useState<Exam | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
   
   // Optimistic UI for deletions
   const [optimisticExams, setOptimisticExams] = useOptimistic(
@@ -124,9 +126,18 @@ export default function ExamsView({ initialExams, problems, currentUser, classro
     <>
       <div className="container mx-auto px-4 py-8 max-w-7xl">
           <div className="flex justify-between items-center mb-8">
-              <h1 className="text-3xl font-bold text-foreground">
-                  Danh sách đề thi
-              </h1>
+              <div className="flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-foreground">
+                        Danh sách đề thi
+                    </h1>
+                    <button 
+                        onClick={() => setShowGuide(true)} 
+                        className="text-muted-foreground hover:text-primary transition-colors" 
+                        title="Hướng dẫn"
+                    >
+                        <QuestionMarkCircleIcon className="h-6 w-6" />
+                    </button>
+              </div>
               {(currentUser.role === 'teacher' || currentUser.role === 'admin') && (
                   <button
                       onClick={() => router.push('/exams/create')}
@@ -171,6 +182,36 @@ export default function ExamsView({ initialExams, problems, currentUser, classro
           title="Xác nhận xóa đề thi"
           message={`Bạn có chắc chắn muốn xóa đề thi "${examToDelete?.title}" không? Hành động này không thể hoàn tác và sẽ xóa vĩnh viễn tất cả các câu hỏi liên quan.`}
       />
+      {/* Guide Modal */}
+      {showGuide && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowGuide(false)}>
+            <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+                <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                    <QuestionMarkCircleIcon className="text-blue-600" />
+                    Hướng dẫn: Đề thi
+                </h3>
+                <div className="space-y-3 text-slate-600">
+                    <p>Đề thi khác với bài tập ở chỗ có giới hạn thời gian nghiêm ngặt và tính năng giám sát.</p>
+                    {currentUser.role === 'student' ? (
+                        <ul className="list-disc list-inside space-y-1">
+                            <li>Chỉ có thể làm bài trong khung giờ "Đang diễn ra".</li>
+                            <li>Hệ thống yêu cầu bật chế độ <strong>Toàn màn hình</strong> trong suốt quá trình làm bài.</li>
+                            <li>Mọi hành động thoát màn hình hoặc chuyển tab đều sẽ được ghi lại và báo cáo cho giáo viên.</li>
+                        </ul>
+                    ) : (
+                        <ul className="list-disc list-inside space-y-1">
+                            <li>Thiết lập thời gian bắt đầu và kết thúc cụ thể.</li>
+                            <li>Có thể đặt <strong>Mật khẩu</strong> để bảo vệ đề thi.</li>
+                            <li>Sau khi thi, bạn có thể xem <strong>Báo cáo giám sát</strong> để biết học sinh nào đã vi phạm quy chế (rời màn hình, mất tập trung).</li>
+                        </ul>
+                    )}
+                </div>
+                <div className="mt-6 text-center">
+                    <button onClick={() => setShowGuide(false)} className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg">Đã hiểu</button>
+                </div>
+            </div>
+        </div>
+    )}
     </>
   );
 };

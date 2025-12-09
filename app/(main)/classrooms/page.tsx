@@ -1,5 +1,4 @@
 
-
 'use client';
 import React, { useState, useMemo, useTransition } from 'react';
 import { useDataContext } from '@/context/DataContext';
@@ -10,6 +9,7 @@ import ConfirmationModal from '@/components/ConfirmationModal';
 import UsersIcon from '@/components/icons/UsersIcon';
 import TrashIcon from '@/components/icons/TrashIcon';
 import Link from 'next/link';
+import QuestionMarkCircleIcon from '@/components/icons/QuestionMarkCircleIcon';
 
 // Teacher's view for creating a new class
 const CreateClassModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
@@ -137,6 +137,7 @@ export default function ClassroomsPage() {
     const [classToDelete, setClassToDelete] = useState<Classroom | null>(null);
     const [studentToRemove, setStudentToRemove] = useState<{classId: string, student: User} | null>(null);
     const [isPending, startTransition] = useTransition();
+    const [showGuide, setShowGuide] = useState(false);
 
     const userClassrooms = useMemo(() => {
         if (!currentUser) return [];
@@ -263,9 +264,18 @@ export default function ClassroomsPage() {
         <>
             <div className="container mx-auto px-4 py-8 max-w-7xl">
                 <div className="flex justify-between items-center mb-8">
-                    <h1 className="text-3xl font-bold text-foreground">
-                        Lớp học của tôi
-                    </h1>
+                     <div className="flex items-center gap-3">
+                        <h1 className="text-3xl font-bold text-foreground">
+                            Lớp học của tôi
+                        </h1>
+                        <button 
+                            onClick={() => setShowGuide(true)} 
+                            className="text-muted-foreground hover:text-primary transition-colors" 
+                            title="Hướng dẫn"
+                        >
+                            <QuestionMarkCircleIcon className="h-6 w-6" />
+                        </button>
+                    </div>
                     {currentUser.role !== 'student' && (
                         <button onClick={() => setIsCreateModalOpen(true)} className="btn-primary px-5 py-2.5">
                             + Tạo lớp học mới
@@ -310,6 +320,36 @@ export default function ClassroomsPage() {
                 confirmButtonText="Rời lớp"
                 confirmButtonClass="bg-destructive hover:bg-destructive/90"
             />
+             {/* Guide Modal */}
+             {showGuide && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowGuide(false)}>
+                    <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                            <QuestionMarkCircleIcon className="text-blue-600" />
+                            Hướng dẫn: Lớp học
+                        </h3>
+                        <div className="space-y-3 text-slate-600">
+                            <p>Tính năng Lớp học giúp tổ chức việc giảng dạy và giao bài theo nhóm học sinh.</p>
+                            {currentUser.role === 'student' ? (
+                                <ul className="list-disc list-inside space-y-1">
+                                    <li>Nhập <strong>Mã tham gia</strong> (do giáo viên cung cấp) để vào lớp kín.</li>
+                                    <li>Hoặc tìm và tham gia các <strong>Lớp học công khai</strong> có sẵn trong danh sách gợi ý.</li>
+                                    <li>Khi vào lớp, bạn sẽ thấy các bài tập và đề thi dành riêng cho lớp đó.</li>
+                                </ul>
+                            ) : (
+                                <ul className="list-disc list-inside space-y-1">
+                                    <li>Tạo lớp học mới và gửi <strong>Mã tham gia</strong> cho học sinh.</li>
+                                    <li>Bạn có thể chọn "Công khai" để cho phép học sinh tự do tham gia mà không cần mã.</li>
+                                    <li>Vào chi tiết lớp học để xem danh sách học sinh và quản lý thành viên (xóa học sinh nếu cần).</li>
+                                </ul>
+                            )}
+                        </div>
+                        <div className="mt-6 text-center">
+                            <button onClick={() => setShowGuide(false)} className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold rounded-lg">Đã hiểu</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     )
 }
