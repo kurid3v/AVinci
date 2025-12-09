@@ -36,7 +36,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-secondary flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-            <h1 className="text-4xl font-extrabold text-foreground">AVinci</h1>
+            <h1 className="text-4xl font-bold text-foreground">AVinci</h1>
             <p className="text-muted-foreground mt-2">Nền tảng học tập Văn học với AI</p>
         </div>
         <form onSubmit={handleLogin} className="bg-card shadow-card rounded-xl border border-border p-8 space-y-6">
@@ -56,7 +56,7 @@ export default function LoginPage() {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="ví dụ: hocsinhan"
+              placeholder="tài khoản admin: adminuser"
               className={inputClasses}
               required
             />
@@ -72,7 +72,7 @@ export default function LoginPage() {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="admin"
                 className={`${inputClasses} pr-10`}
                 required
               />

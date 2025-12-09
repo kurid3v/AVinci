@@ -8,13 +8,10 @@ import EyeIcon from '@/components/icons/EyeIcon';
 import EyeOffIcon from '@/components/icons/EyeOffIcon';
 import UserCircleIcon from '@/components/icons/UserCircleIcon';
 
-const TEACHER_PIN = '4444';
-
 export default function SignUpPage() {
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [role, setRole] = useState<'teacher' | 'student'>('student');
-  const [pin, setPin] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -59,10 +56,6 @@ export default function SignUpPage() {
     if (!username.trim()) {
       setError('Tên đăng nhập không được để trống.');
       return;
-    }
-    if (role === 'teacher' && pin !== TEACHER_PIN) {
-        setError('Mã PIN dành cho giáo viên không chính xác.');
-        return;
     }
     if (password.length < 6) {
       setError('Mật khẩu phải có ít nhất 6 ký tự.');
@@ -157,22 +150,6 @@ export default function SignUpPage() {
             </div>
           </div>
           
-          {role === 'teacher' && (
-             <div>
-                <label htmlFor="pin-input" className="block text-foreground text-sm font-semibold mb-2">
-                  Mã PIN dành cho giáo viên
-                </label>
-                <input
-                    id="pin-input"
-                    type="password"
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                    placeholder="Nhập mã PIN"
-                    className={inputClasses}
-                />
-             </div>
-          )}
-
           <div>
             <label htmlFor="password-input" className="block text-foreground text-sm font-semibold mb-2">
               Mật khẩu
@@ -225,7 +202,7 @@ export default function SignUpPage() {
             <button
               type="submit"
               className="w-full btn-primary font-bold py-3 px-4 disabled:cursor-not-allowed"
-              disabled={!displayName || !username || !password || !confirmPassword || (role === 'teacher' && !pin)}
+              disabled={!displayName || !username || !password || !confirmPassword}
             >
               Đăng ký
             </button>
