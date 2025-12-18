@@ -5,11 +5,11 @@ interface IconProps {
   className?: string;
 }
 
-// Fixed: Redefined component to resolve "className does not exist on type IntrinsicAttributes" errors
-const ArrowPathIcon = ({ className = "h-6 w-6" }: IconProps) => (
-  <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-  </svg>
-);
-
-export default ArrowPathIcon;
+// Fixed: Using standard function component definition to resolve "className does not exist on type IntrinsicAttributes" errors in consumers like SubmissionResultPage.
+export default function ArrowPathIcon({ className = "h-6 w-6" }: IconProps) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+  );
+}

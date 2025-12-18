@@ -8,16 +8,17 @@ import LockClosedIcon from '@/components/icons/LockClosedIcon';
 import PasswordModal from '@/components/PasswordModal';
 import EyeOffIcon from '@/components/icons/EyeOffIcon';
 import ExclamationIcon from '@/components/icons/ExclamationIcon';
-import type { Problem, ExamAttempt } from '@/types';
+import ChartBarIcon from '@/components/icons/ChartBarIcon';
+import type { Problem, ExamAttempt, Submission, User } from '@/types';
 
 
 export default function ExamDetailPage({ params }: { params: { examId: string } }) {
   const router = useRouter();
-  const { exams, problems, currentUser, users, examAttempts, startExamAttempt } = useDataContext();
+  const { exams, problems, currentUser, users, examAttempts, submissions, startExamAttempt } = useDataContext();
 
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [passwordError, setPasswordError] = useState('');
-  const [activeTab, setActiveTab] = useState<'questions' | 'monitoring'>('questions');
+  const [activeTab, setActiveTab] = useState<'questions' | 'monitoring' | 'leaderboard'>('questions');
   
   if (!currentUser) return null;
 
@@ -28,10 +29,7 @@ export default function ExamDetailPage({ params }: { params: { examId: string } 
   const now = Date.now();
   const isExamOngoing = now >= exam.startTime && now <= exam.endTime;
   
-  // Find the attempt for THIS specific exam
   const userAttemptForThisExam = examAttempts.find(att => att.examId === exam.id && att.studentId === currentUser.id);
-  
-  // Find if the user has ANY ongoing attempt
   const ongoingGlobalAttempt = examAttempts.find(att => att.studentId === currentUser.id && !att.submittedAt);
   const otherOngoingExam = ongoingGlobalAttempt && ongoingGlobalAttempt.examId !== exam.id 
     ? exams.find(e => e.id === ongoingGlobalAttempt.examId) 
@@ -39,13 +37,10 @@ export default function ExamDetailPage({ params }: { params: { examId: string } 
 
   const isTeacherOrAdmin = currentUser.role === 'teacher' || currentUser.role === 'admin';
 
-  // FIX: Make proceedToExam async and await the startExamAttempt call.
   const proceedToExam = async () => {
     if (userAttemptForThisExam) {
-      // Resume existing attempt
       router.push(`/exams/${exam.id}/take/${userAttemptForThisExam.id}`);
     } else {
-      // Create new attempt
       const newAttempt = await startExamAttempt(exam.id);
       if (newAttempt) {
         router.push(`/exams/${exam.id}/take/${newAttempt.id}`);
@@ -55,10 +50,8 @@ export default function ExamDetailPage({ params }: { params: { examId: string } 
 
   const handleStartExamClick = () => {
     if (exam.password) {
-      // Always ask for password if one is set
       setIsPasswordModalOpen(true);
     } else {
-      // No password, proceed directly
       proceedToExam();
     }
   };
@@ -67,7 +60,6 @@ export default function ExamDetailPage({ params }: { params: { examId: string } 
     if (password === exam.password) {
       setPasswordError('');
       setIsPasswordModalOpen(false);
-      // Password is correct, now proceed
       proceedToExam();
     } else {
       setPasswordError('Mật khẩu không chính xác.');
@@ -83,10 +75,111 @@ export default function ExamDetailPage({ params }: { params: { examId: string } 
     >
         <td className="p-3 text-center font-semibold text-slate-600">{index + 1}</td>
         <td className="p-3 font-semibold text-slate-800">{problem.title}</td>
-        <td className="p-3 text-slate-600 truncate max-w-sm">{problem.prompt}</td>
+        <td className="p-3 text-slate-600 truncate max-w-sm">{problem.prompt || problem.passage}</td>
         <td className="p-3 text-right font-bold text-blue-600">{problem.customMaxScore || 10}</td>
     </tr>
   );
+
+  const LeaderboardTab: React.FC = () => {
+    const examSubmissions = submissions.filter(s => s.examId === exam.id);
+    
+    const ranking = useMemo(() => {
+        const scoresMap = new Map<string, { total: number, count: number }>();
+        
+        examSubmissions.forEach(sub => {
+            const current = scoresMap.get(sub.submitterId) || { total: 0, count: 0 };
+            scoresMap.set(sub.submitterId, {
+                total: current.total + sub.feedback.totalScore,
+                count: current.count + 1
+            });
+        });
+
+        return Array.from(scoresMap.entries())
+            .map(([userId, data]) => ({
+                user: users.find(u => u.id === userId),
+                ...data
+            }))
+            .filter(item => item.user)
+            .sort((a, b) => b.total - a.total);
+    }, [examSubmissions, users]);
+
+    const maxPossibleScore = examProblems.reduce((sum, p) => sum + (p.customMaxScore || 10), 0);
+
+    if (ranking.length === 0) {
+        return (
+            <div className="bg-white p-12 rounded-xl shadow-lg border border-slate-200 text-center">
+                <ChartBarIcon className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                <p className="text-slate-500 font-medium">Chưa có dữ liệu xếp hạng cho đề thi này.</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+            <div className="p-6 bg-slate-50 border-b border-slate-200">
+                <h3 className="text-xl font-bold text-slate-800">Bảng thứ hạng học sinh</h3>
+                <p className="text-sm text-slate-500 mt-1">Xếp hạng dựa trên tổng điểm của tất cả các câu hỏi trong đề thi.</p>
+            </div>
+            <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                    <thead>
+                        <tr className="bg-slate-50 border-b-2 border-slate-200">
+                            <th className="p-4 font-bold text-slate-600 w-20 text-center">Hạng</th>
+                            <th className="p-4 font-bold text-slate-600">Học sinh</th>
+                            <th className="p-4 font-bold text-slate-600 text-center">Số câu nộp</th>
+                            <th className="p-4 font-bold text-slate-600 text-right">Tổng điểm</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {ranking.map((item, index) => {
+                            const isTop3 = index < 3;
+                            const rankColors = ['text-amber-500', 'text-slate-400', 'text-orange-600'];
+                            return (
+                                <tr key={item.user!.id} className={`border-b border-slate-100 hover:bg-blue-50/30 transition-colors ${item.user!.id === currentUser.id ? 'bg-blue-50' : ''}`}>
+                                    <td className="p-4 text-center">
+                                        {isTop3 ? (
+                                            <span className={`text-2xl font-black ${rankColors[index]}`}>
+                                                {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                                            </span>
+                                        ) : (
+                                            <span className="font-bold text-slate-500">{index + 1}</span>
+                                        )}
+                                    </td>
+                                    <td className="p-4">
+                                        <div className="flex items-center gap-3">
+                                            {item.user?.avatar ? (
+                                                <img src={item.user.avatar} className="w-8 h-8 rounded-full object-cover" alt="" />
+                                            ) : (
+                                                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500">
+                                                    {item.user?.displayName.charAt(0)}
+                                                </div>
+                                            )}
+                                            <div>
+                                                <p className="font-bold text-slate-800">
+                                                    {item.user?.displayName}
+                                                    {item.user?.id === currentUser.id && <span className="ml-2 text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded-full uppercase">Bạn</span>}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="p-4 text-center text-slate-600 font-medium">
+                                        {item.count} / {examProblems.length}
+                                    </td>
+                                    <td className="p-4 text-right">
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-xl font-black text-blue-600">{item.total.toFixed(2).replace(/\.00$/, '')}</span>
+                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">trên {maxPossibleScore}</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+  };
 
   const MonitoringTab: React.FC = () => {
     const [monitoringView, setMonitoringView] = useState<'student' | 'time'>('student');
@@ -322,18 +415,19 @@ export default function ExamDetailPage({ params }: { params: { examId: string } 
           </header>
 
           <main>
-              {isTeacherOrAdmin && (
-                <div className="mb-6 border-b border-slate-200">
-                    <button onClick={() => setActiveTab('questions')} className={`px-4 py-2 font-semibold ${activeTab === 'questions' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`}>Câu hỏi</button>
-                    <button onClick={() => setActiveTab('monitoring')} className={`px-4 py-2 font-semibold ${activeTab === 'monitoring' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'}`}>Giám sát</button>
-                </div>
-              )}
+              <div className="mb-6 border-b border-slate-200 flex gap-2 overflow-x-auto scrollbar-hide">
+                  <button onClick={() => setActiveTab('questions')} className={`px-4 py-2 font-bold transition-all border-b-2 whitespace-nowrap ${activeTab === 'questions' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Câu hỏi</button>
+                  <button onClick={() => setActiveTab('leaderboard')} className={`px-4 py-2 font-bold transition-all border-b-2 whitespace-nowrap ${activeTab === 'leaderboard' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Bảng xếp hạng</button>
+                  {isTeacherOrAdmin && (
+                    <button onClick={() => setActiveTab('monitoring')} className={`px-4 py-2 font-bold transition-all border-b-2 whitespace-nowrap ${activeTab === 'monitoring' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Giám sát</button>
+                  )}
+              </div>
             
-            {activeTab === 'questions' && isTeacherOrAdmin && (
+            {activeTab === 'questions' && (
                  <>
                     <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-3xl font-bold text-slate-800">
-                            Danh sách câu hỏi
+                        <h2 className="text-2xl font-bold text-slate-800">
+                            Chi tiết đề thi
                         </h2>
                         {(currentUser.role === 'teacher' || currentUser.role === 'admin') && (
                             <button
@@ -374,6 +468,8 @@ export default function ExamDetailPage({ params }: { params: { examId: string } 
                     </div>
                 </>
             )}
+
+            {activeTab === 'leaderboard' && <LeaderboardTab />}
 
             {activeTab === 'monitoring' && isTeacherOrAdmin && <MonitoringTab />}
              

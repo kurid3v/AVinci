@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
@@ -28,8 +29,9 @@ export const SessionProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     useEffect(() => {
         try {
-            const loggedInUserJson = sessionStorage.getItem('loggedInUser');
-            const impersonatedUserJson = sessionStorage.getItem('impersonatedUser');
+            // Changed from sessionStorage to localStorage to persist across tabs
+            const loggedInUserJson = localStorage.getItem('loggedInUser');
+            const impersonatedUserJson = localStorage.getItem('impersonatedUser');
             if (loggedInUserJson) {
                 setLoggedInUser(JSON.parse(loggedInUserJson));
             }
@@ -37,8 +39,8 @@ export const SessionProvider: React.FC<{ children: ReactNode }> = ({ children })
                 setImpersonatedUser(JSON.parse(impersonatedUserJson));
             }
         } catch (error) {
-            console.error("Failed to parse user from session storage", error);
-            sessionStorage.clear();
+            console.error("Failed to parse user from local storage", error);
+            localStorage.clear();
         } finally {
             setIsLoading(false);
         }
@@ -54,7 +56,8 @@ export const SessionProvider: React.FC<{ children: ReactNode }> = ({ children })
             if (response.ok) {
                 const userSession = await response.json();
                 setLoggedInUser(userSession);
-                sessionStorage.setItem('loggedInUser', JSON.stringify(userSession));
+                // Changed from sessionStorage to localStorage
+                localStorage.setItem('loggedInUser', JSON.stringify(userSession));
                 return true;
             }
         } catch (error) {
@@ -75,7 +78,8 @@ export const SessionProvider: React.FC<{ children: ReactNode }> = ({ children })
             if (response.ok) {
                 const { user } = data;
                 setLoggedInUser(user);
-                sessionStorage.setItem('loggedInUser', JSON.stringify(user));
+                // Changed from sessionStorage to localStorage
+                localStorage.setItem('loggedInUser', JSON.stringify(user));
                 return { success: true };
             }
             return { success: false, message: data.message || 'Signup failed' };
@@ -88,20 +92,23 @@ export const SessionProvider: React.FC<{ children: ReactNode }> = ({ children })
     const logout = () => {
         setLoggedInUser(null);
         setImpersonatedUser(null);
-        sessionStorage.removeItem('loggedInUser');
-        sessionStorage.removeItem('impersonatedUser');
+        // Changed from sessionStorage to localStorage
+        localStorage.removeItem('loggedInUser');
+        localStorage.removeItem('impersonatedUser');
     };
     
     const impersonate = (userToImpersonate: UserSession) => {
         if (loggedInUser?.role === 'admin') {
             setImpersonatedUser(userToImpersonate);
-            sessionStorage.setItem('impersonatedUser', JSON.stringify(userToImpersonate));
+            // Changed from sessionStorage to localStorage
+            localStorage.setItem('impersonatedUser', JSON.stringify(userToImpersonate));
         }
     };
 
     const stopImpersonating = () => {
         setImpersonatedUser(null);
-        sessionStorage.removeItem('impersonatedUser');
+        // Changed from sessionStorage to localStorage
+        localStorage.removeItem('impersonatedUser');
     };
 
     const value: SessionContextType = {
