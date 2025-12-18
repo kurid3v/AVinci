@@ -27,25 +27,18 @@ export async function POST(request: Request) {
     if (action === 'grade') {
       const { problemId, prompt, essay, rubric, rawRubric, customMaxScore } = payload;
       
-      // Get all existing submissions for this problem to find a reference example
       const allSubmissions = await db.all.submissions;
       const existingSubmissions = allSubmissions.filter(s => s.problemId === problemId && s.essay);
       const existingEssays = existingSubmissions.map(s => s.essay).filter(Boolean) as string[];
 
-      // IMPORTANT: Only use teacher-edited submissions as examples to prevent "AI score inflation"
-      // If we use AI's own high scores as reference, it creates a bias loop.
       let bestExample: Submission | null = null;
       const teacherEditedSubmissions = existingSubmissions.filter(s => s.lastEditedByTeacherAt);
       
       if (teacherEditedSubmissions.length > 0) {
-          // Use the most recently edited teacher feedback as the gold standard
           bestExample = teacherEditedSubmissions.reduce((prev, current) => 
               (new Date(prev.lastEditedByTeacherAt!) > new Date(current.lastEditedByTeacherAt!)) ? prev : current
           );
       }
-      
-      // We explicitly skip using the highest AI score if no teacher has reviewed anything.
-      // This ensures grading remains objective based on the rubric alone unless guided by a human.
       
       const examplePayload = bestExample ? { essay: bestExample.essay!, feedback: bestExample.feedback as any } : undefined;
       
@@ -55,6 +48,63 @@ export async function POST(request: Request) {
       ]);
       
       return NextResponse.json({ feedback, similarityCheck });
+    }
+    
+    // Optimized Regrade All action to ensure consistent reference example for the entire batch
+    if (action === 'regrade_all') {
+        const { problemId } = payload;
+        const problem = (await db.all.problems).find(p => p.id === problemId);
+        if (!problem) return NextResponse.json({ error: 'Problem not found' }, { status: 404 });
+
+        const allSubmissions = await db.all.submissions;
+        const problemSubmissions = allSubmissions.filter(s => s.problemId === problemId);
+        const existingEssays = problemSubmissions.map(s => s.essay).filter(Boolean) as string[];
+
+        // Find reference example once for the whole batch
+        let bestExample: Submission | null = null;
+        const teacherEditedSubmissions = problemSubmissions.filter(s => s.lastEditedByTeacherAt);
+        if (teacherEditedSubmissions.length > 0) {
+            bestExample = teacherEditedSubmissions.reduce((prev, current) => 
+                (new Date(prev.lastEditedByTeacherAt!) > new Date(current.lastEditedByTeacherAt!)) ? prev : current
+            );
+        }
+        const examplePayload = bestExample ? { essay: bestExample.essay!, feedback: bestExample.feedback as any } : undefined;
+
+        const results = [];
+        for (const sub of problemSubmissions) {
+            try {
+                let updatedFeedback;
+                let updatedSimilarity;
+
+                if (problem.type === 'essay' && sub.essay) {
+                    [updatedFeedback, updatedSimilarity] = await Promise.all([
+                        gradeEssayOnServer(
+                            problem.prompt!, 
+                            sub.essay, 
+                            problem.rubricItems || [], 
+                            problem.rawRubric || '', 
+                            String(problem.customMaxScore || 10),
+                            examplePayload
+                        ),
+                        checkSimilarityOnServer(sub.essay, existingEssays)
+                    ]);
+                } else if (problem.type === 'reading_comprehension' && sub.answers) {
+                    updatedFeedback = await gradeReadingComprehensionOnServer(problem, sub.answers);
+                }
+
+                if (updatedFeedback) {
+                    const updatedSub = await db.submissions.update(sub.id, {
+                        feedback: updatedFeedback,
+                        similarityCheck: updatedSimilarity,
+                        lastEditedByTeacherAt: undefined
+                    });
+                    results.push(updatedSub);
+                }
+            } catch (err) {
+                console.error(`Failed to regrade ${sub.id}:`, err);
+            }
+        }
+        return NextResponse.json({ success: true, updatedCount: results.length });
     }
     
     if (action === 'grade_reading_comprehension') {

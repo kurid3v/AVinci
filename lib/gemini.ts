@@ -142,7 +142,7 @@ Nhiệm vụ của bạn là nhận một khối văn bản hỗn hợp và cấ
             systemInstruction,
             responseMimeType: "application/json",
             responseSchema: smartExtractSchema,
-            temperature: 0.1,
+            temperature: 0,
         },
     }));
     const jsonText = extractJson(response.text);
@@ -162,7 +162,7 @@ Bạn cần phân tách văn bản đó và gán từng câu trả lời vào đ
         config: {
             systemInstruction,
             responseMimeType: "application/json",
-            temperature: 0.1,
+            temperature: 0,
         },
     }));
     const jsonText = extractJson(response.text);
@@ -232,7 +232,7 @@ Lưu ý: Không được tự ý nâng điểm nếu bài làm thực tế khôn
             systemInstruction: "Bạn là giáo viên chấm bài văn khách quan và khắt khe. Phân tích dựa trên biểu điểm và trả về JSON chi tiết. Nếu có bài ví dụ đi kèm, chỉ sử dụng nó để tham khảo mức độ chi tiết của nhận xét, không được dùng để thay đổi tiêu chuẩn chấm điểm.",
             responseMimeType: "application/json",
             responseSchema: gradingResponseSchema,
-            temperature: 0.2,
+            temperature: 0,
         }
     }));
     const json = extractJson(response.text);
@@ -263,7 +263,7 @@ Nhiệm vụ:
             systemInstruction,
             responseMimeType: "application/json",
             responseSchema: gradingResponseSchema,
-            temperature: 0.1
+            temperature: 0
         }
     }));
 
@@ -289,6 +289,7 @@ export async function parseRubricOnServer(rawRubricText: string): Promise<Omit<R
             systemInstruction: "Trích xuất biểu điểm thành mảng JSON.",
             responseMimeType: "application/json",
             responseSchema: schema,
+            temperature: 0,
         }
     }));
     return JSON.parse(extractJson(response.text)!);
@@ -318,7 +319,8 @@ export async function extractReadingComprehensionOnServer(rawContent: string): P
         config: {
             systemInstruction: "Trích xuất bài đọc hiểu JSON.",
             responseMimeType: "application/json",
-            responseSchema: { type: Type.OBJECT, properties: { passage: { type: Type.STRING }, questions: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { questionText: { type: Type.STRING }, questionType: { type: Type.STRING }, maxScore: { type: Type.NUMBER } } } } } }
+            responseSchema: { type: Type.OBJECT, properties: { passage: { type: Type.STRING }, questions: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { questionText: { type: Type.STRING }, questionType: { type: Type.STRING }, maxScore: { type: Type.NUMBER } } } } } },
+            temperature: 0,
         }
     }));
     return JSON.parse(extractJson(response.text)!);

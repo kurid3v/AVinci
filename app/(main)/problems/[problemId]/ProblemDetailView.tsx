@@ -10,7 +10,7 @@ import StudentGraderView from '@/components/StudentGraderView';
 import ReadingComprehensionSolver from './ReadingComprehensionSolver'; // New component
 import { useDataContext } from '@/context/DataContext';
 import { deleteProblem } from '@/app/actions';
-import { gradeEssay, gradeReadingComprehension } from '@/services/geminiService';
+import { regradeAllProblemSubmissions } from '@/services/geminiService';
 import TrashIcon from '@/components/icons/TrashIcon';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import PencilIcon from '@/components/icons/PencilIcon';
@@ -31,8 +31,7 @@ const TeacherSubmissionsView: React.FC<{
     users: Omit<User, 'password'>[],
     onRegradeAll: () => void,
     isRegrading: boolean,
-    regradeProgress: string
-}> = ({ problem, submissions, users, onRegradeAll, isRegrading, regradeProgress }) => {
+}> = ({ problem, submissions, users, onRegradeAll, isRegrading }) => {
     const router = useRouter();
 
     if (submissions.length === 0) {
@@ -48,8 +47,9 @@ const TeacherSubmissionsView: React.FC<{
             <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-foreground">Danh sách</h3>
                 {isRegrading ? (
-                    <span className="text-sm font-semibold text-blue-600 animate-pulse">
-                        Đang chấm lại: {regradeProgress}
+                    <span className="text-sm font-semibold text-blue-600 animate-pulse flex items-center gap-2">
+                        <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                        Đang chấm lại...
                     </span>
                 ) : (
                     <button 
@@ -80,7 +80,6 @@ const TeacherSubmissionsView: React.FC<{
                                 : sub.feedback.totalScore.toFixed(2);
                             return (
                                 <tr key={sub.id} onClick={() => router.push(`/submissions/${sub.id}`)} className="cursor-pointer hover:bg-muted/50 border-b border-border last:border-b-0">
-                                    {/* FIX: Property 'name' does not exist on type 'User'. Used 'displayName' instead. */}
                                     <td className="p-3 font-semibold text-foreground">{submitter?.displayName || 'Không rõ'}</td>
                                     <td className="p-3 text-muted-foreground text-sm">{new Date(sub.submittedAt).toLocaleString()}</td>
                                     <td className="p-3 font-bold text-primary text-right">{displayScore}</td>
@@ -97,11 +96,10 @@ const TeacherSubmissionsView: React.FC<{
 
 export default function ProblemDetailView({ problem, problemSubmissions, users, currentUser, teacherName }: ProblemDetailViewProps) {
     const router = useRouter();
-    const { addSubmissionAndSyncState, updateSubmission } = useDataContext();
+    const { addSubmissionAndSyncState, refetchData } = useDataContext();
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isRegradeModalOpen, setIsRegradeModalOpen] = useState(false);
     const [isRegrading, setIsRegrading] = useState(false);
-    const [regradeProgress, setRegradeProgress] = useState('');
     const [isPending, startTransition] = useTransition();
 
     if (!currentUser) {
@@ -124,47 +122,17 @@ export default function ProblemDetailView({ problem, problemSubmissions, users, 
     const handleRegradeAll = async () => {
         setIsRegradeModalOpen(false);
         setIsRegrading(true);
-        const total = problemSubmissions.length;
-        let count = 0;
-
-        for (const sub of problemSubmissions) {
-            count++;
-            setRegradeProgress(`${count}/${total}`);
-            try {
-                let updatedFeedback;
-                let updatedSimilarity;
-
-                if (problem.type === 'essay') {
-                    if (!sub.essay) continue;
-                    const result = await gradeEssay(
-                        problem.id,
-                        problem.prompt!,
-                        sub.essay,
-                        problem.rubricItems || [],
-                        problem.rawRubric || '',
-                        String(problem.customMaxScore || '10')
-                    );
-                    updatedFeedback = result.feedback;
-                    updatedSimilarity = result.similarityCheck;
-                } else {
-                    if (!sub.answers) continue;
-                    updatedFeedback = await gradeReadingComprehension(problem, sub.answers);
-                }
-
-                if (updatedFeedback) {
-                    await updateSubmission(sub.id, {
-                        feedback: updatedFeedback,
-                        similarityCheck: updatedSimilarity,
-                        lastEditedByTeacherAt: undefined // Reset teacher edit timestamp as AI regraded it
-                    });
-                }
-            } catch (error) {
-                console.error(`Failed to regrade submission ${sub.id}:`, error);
-            }
+        try {
+            // Using a single batch regrade API to ensure consistent prompting and reference usage
+            await regradeAllProblemSubmissions(problem.id);
+            await refetchData();
+        } catch (error) {
+            console.error("Failed to regrade all submissions:", error);
+            alert("Đã xảy ra lỗi trong quá trình chấm lại. Một số bài có thể chưa được cập nhật.");
+        } finally {
+            setIsRegrading(false);
+            router.refresh();
         }
-        setIsRegrading(false);
-        setRegradeProgress('');
-        router.refresh();
     };
 
     const handleDeleteProblem = () => {
@@ -297,7 +265,6 @@ export default function ProblemDetailView({ problem, problemSubmissions, users, 
                                         users={users} 
                                         onRegradeAll={() => setIsRegradeModalOpen(true)}
                                         isRegrading={isRegrading}
-                                        regradeProgress={regradeProgress}
                                     />
                                 </div>
                             )}

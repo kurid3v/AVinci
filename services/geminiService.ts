@@ -61,6 +61,15 @@ export async function gradeEssay(problemId: string, prompt: string, essay: strin
   }
 }
 
+export async function regradeAllProblemSubmissions(problemId: string): Promise<{ success: boolean; updatedCount: number }> {
+    try {
+        return await callApi<{ success: boolean; updatedCount: number }>('regrade_all', { problemId });
+    } catch (error) {
+        console.error("Error in regradeAllProblemSubmissions service:", error);
+        throw error;
+    }
+}
+
 export async function gradeReadingComprehension(problem: Problem, answers: Answer[]): Promise<Feedback> {
   try {
     return await callApi<Feedback>('grade_reading_comprehension', { problem, answers });
