@@ -9,10 +9,11 @@ import FeedbackDisplay from '@/components/FeedbackDisplay';
 import type { Question, Answer, User, Submission, Problem, DetailedFeedbackItem, Feedback } from '@/types';
 import SimilarityCheckDisplay from '@/components/SimilarityCheckDisplay';
 import PencilIcon from '@/components/icons/PencilIcon';
+import ArrowPathIcon from '@/components/icons/ArrowPathIcon';
 import SubmissionHistory from '@/components/SubmissionHistory';
-// FIX: Added missing icon imports.
 import CheckIcon from '@/components/icons/CheckIcon';
 import XCircleIcon from '@/components/icons/XCircleIcon';
+import { regradeSelectedSubmissions } from '@/services/geminiService';
 
 const EssayResult: React.FC<{
     submission: Submission,
@@ -76,10 +77,10 @@ const EssayResult: React.FC<{
 
     if (isEditing) {
         return (
-            <div className="bg-card p-6 rounded-xl border border-primary/50 shadow-lg space-y-6">
+            <div className="bg-card p-6 rounded-xl border border-primary/50 shadow-lg space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
                  <div>
-                    <h3 className="text-xl font-semibold text-foreground mb-3 flex items-center gap-2">
-                        <PencilIcon />
+                    <h3 className="text-xl font-bold text-foreground mb-3 flex items-center gap-2">
+                        <PencilIcon className="text-primary" />
                         Chỉnh sửa Phân tích chi tiết
                     </h3>
                     <div className="space-y-4">
@@ -87,26 +88,26 @@ const EssayResult: React.FC<{
                          const rubricItem = problem.rubricItems?.find(r => r.criterion === item.criterion);
                          const maxScore = rubricItem?.maxScore ?? item.score;
                         return(
-                        <div key={index} className="bg-secondary/50 p-4 rounded-lg">
+                        <div key={index} className="bg-muted/30 p-4 rounded-lg border border-border">
                             <div className="flex justify-between items-center mb-2">
-                                <h4 className="font-semibold text-lg text-foreground">{item.criterion}</h4>
+                                <h4 className="font-bold text-foreground">{item.criterion}</h4>
                                 <div className="flex items-center gap-2">
                                     <input 
                                         type="number" 
                                         value={item.score}
                                         onChange={e => handleDetailChange(index, 'score', e.target.value)}
-                                        className="w-24 p-2 text-right font-bold text-lg text-primary bg-background rounded-md border border-border"
+                                        className="w-24 p-2 text-right font-black text-lg text-primary bg-background rounded-md border border-border focus:ring-2 focus:ring-primary/20"
                                         step="0.25"
                                         max={maxScore}
                                         min="0"
                                     />
-                                    <span className="font-semibold text-muted-foreground">/ {maxScore} điểm</span>
+                                    <span className="font-bold text-muted-foreground text-sm">/ {maxScore}đ</span>
                                 </div>
                             </div>
                             <textarea
                                 value={item.feedback}
                                 onChange={e => handleDetailChange(index, 'feedback', e.target.value)}
-                                className="w-full p-2 bg-background border border-border rounded-md resize-y"
+                                className="w-full p-3 bg-background border border-border rounded-md resize-y text-sm focus:ring-2 focus:ring-primary/20"
                                 rows={3}
                             />
                         </div>
@@ -114,22 +115,22 @@ const EssayResult: React.FC<{
                     </div>
                 </div>
                  <div>
-                    <h3 className="text-xl font-semibold text-foreground mb-3">Chỉnh sửa Gợi ý chung</h3>
+                    <h3 className="text-xl font-bold text-foreground mb-3">Chỉnh sửa Gợi ý chung</h3>
                     <div className="space-y-2">
                     {editedFeedback.generalSuggestions?.map((suggestion, index) => (
                          <textarea
                             key={index}
                             value={suggestion}
                             onChange={e => handleGeneralSuggestionChange(index, e.target.value)}
-                            className="w-full p-2 bg-background border border-border rounded-md resize-y"
+                            className="w-full p-3 bg-background border border-border rounded-md resize-y text-sm focus:ring-2 focus:ring-primary/20"
                             rows={2}
                         />
                     ))}
                     </div>
                 </div>
                  <div className="flex justify-end gap-4 pt-4 border-t border-border">
-                    <button onClick={handleCancel} disabled={isPending} className="btn-secondary px-6 py-2">Hủy</button>
-                    <button onClick={handleSave} disabled={isPending} className="btn-primary px-6 py-2">
+                    <button onClick={handleCancel} disabled={isPending} className="btn-secondary px-8 py-2.5">Hủy</button>
+                    <button onClick={handleSave} disabled={isPending} className="btn-primary px-8 py-2.5 shadow-md">
                         {isPending ? 'Đang lưu...' : 'Lưu thay đổi'}
                     </button>
                 </div>
@@ -142,10 +143,10 @@ const EssayResult: React.FC<{
             {isTeacherOrAdmin && (
                 <button 
                     onClick={() => setIsEditing(true)}
-                    className="absolute -top-12 right-0 btn-outline px-4 py-2 text-sm flex items-center gap-2"
+                    className="absolute -top-14 right-0 btn-outline px-4 py-2 text-sm flex items-center gap-2 border-primary/20 text-primary hover:bg-primary/5 font-bold"
                 >
                     <PencilIcon className="h-4 w-4" />
-                    Chỉnh sửa chấm điểm
+                    Chỉnh sửa điểm & nhận xét
                 </button>
             )}
             <FeedbackDisplay feedback={submission.feedback} problem={problem} />
@@ -233,11 +234,11 @@ const ReadingComprehensionResult: React.FC<{
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-foreground">Chi tiết bài làm</h2>
+                <h2 className="text-2xl font-black text-foreground">Chi tiết câu trả lời</h2>
                 {isTeacherOrAdmin && !isEditing && (
-                    <button onClick={() => setIsEditing(true)} className="btn-outline px-4 py-2 text-sm flex items-center gap-2">
+                    <button onClick={() => setIsEditing(true)} className="btn-outline px-4 py-2 text-sm flex items-center gap-2 border-primary/20 text-primary hover:bg-primary/5 font-bold">
                         <PencilIcon className="h-4 w-4" />
-                        Chỉnh sửa chấm điểm
+                        Chỉnh sửa điểm & nhận xét
                     </button>
                 )}
             </div>
@@ -248,65 +249,78 @@ const ReadingComprehensionResult: React.FC<{
                 const isCorrect = feedbackItem ? feedbackItem.score === (q.maxScore ?? 1) : false;
                 
                 return (
-                    <div key={q.id} className="bg-card p-5 rounded-lg border border-border">
-                        <p className="font-semibold text-foreground text-lg">Câu {index + 1}: {q.questionText}</p>
+                    <div key={q.id} className="bg-card p-6 rounded-xl border border-border shadow-sm">
+                        <p className="font-bold text-foreground text-lg mb-4">Câu {index + 1}: {q.questionText}</p>
                         {q.questionType === 'multiple_choice' ? (
-                            <div className="mt-3 space-y-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                                 {q.options?.map(opt => {
                                     const isSelected = answer?.selectedOptionId === opt.id;
                                     const isCorrectAnswer = q.correctOptionId === opt.id;
-                                    let stateClass = '';
-                                    if (isSelected && !isCorrectAnswer) stateClass = 'bg-red-100 border-red-300';
-                                    if (isCorrectAnswer) stateClass = 'bg-green-100 border-green-300';
+                                    let stateClass = 'bg-background border-border opacity-70';
+                                    if (isSelected && !isCorrectAnswer) stateClass = 'bg-red-50 border-red-200 ring-2 ring-red-500/20';
+                                    if (isCorrectAnswer) stateClass = 'bg-green-50 border-green-200 ring-2 ring-green-500/20 font-bold opacity-100';
 
                                     return (
-                                        <div key={opt.id} className={`flex items-center gap-3 p-2 rounded-md border ${stateClass}`}>
-                                            <input type="radio" checked={isSelected} readOnly className="form-radio" />
-                                            <span>{opt.text}</span>
+                                        <div key={opt.id} className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${stateClass}`}>
+                                            <div className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-primary' : 'border-slate-300'}`}>
+                                                {isSelected && <div className="h-2 w-2 rounded-full bg-primary" />}
+                                            </div>
+                                            <span className="text-sm">{opt.text}</span>
                                         </div>
                                     );
                                 })}
                             </div>
                         ) : (
-                            <p className="mt-2 p-3 bg-secondary rounded-md whitespace-pre-wrap">
-                                {answer?.writtenAnswer || <span className="text-muted-foreground italic">Không có câu trả lời</span>}
-                            </p>
+                            <div className="mb-4">
+                                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1 block">Câu trả lời học sinh:</label>
+                                <p className="p-4 bg-muted/30 rounded-xl whitespace-pre-wrap text-foreground italic border border-border">
+                                    {answer?.writtenAnswer || <span className="text-muted-foreground italic">Không có câu trả lời</span>}
+                                </p>
+                            </div>
                         )}
                         <div className={`mt-4 pt-4 border-t border-dashed ${isCorrect ? 'border-green-300' : 'border-red-300'}`}>
                             <div className="flex justify-between items-start gap-4">
                                 <div className="flex-grow">
-                                    <div className="flex items-center gap-2">
-                                        {isCorrect ? <CheckIcon /> : <XCircleIcon />}
-                                        <h4 className="font-semibold text-foreground">Nhận xét của AI:</h4>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className={`p-1.5 rounded-full ${isCorrect ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                                            {isCorrect ? <CheckIcon className="h-4 w-4" /> : <XCircleIcon className="h-4 w-4" />}
+                                        </div>
+                                        <h4 className="font-bold text-foreground text-sm">Nhận xét của AI:</h4>
                                     </div>
                                     {isEditing ? (
                                         <textarea 
                                             value={editedFeedbacks[q.id] || ''}
                                             onChange={e => setEditedFeedbacks(prev => ({...prev, [q.id]: e.target.value}))}
-                                            className="w-full p-2 mt-1 bg-background border border-border rounded-md"
+                                            className="w-full p-3 bg-background border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary/20"
                                             rows={2}
+                                            placeholder="Nhập nhận xét thủ công..."
                                         />
                                     ) : (
-                                        <p className="text-muted-foreground pl-8">{feedbackItem?.feedback}</p>
+                                        <p className="text-muted-foreground text-sm pl-9 italic leading-relaxed">{feedbackItem?.feedback}</p>
                                     )}
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-shrink-0">
                                      {isEditing ? (
-                                        <input 
-                                            type="number"
-                                            value={editedScores[q.id] ?? 0}
-                                            onChange={e => setEditedScores(prev => ({...prev, [q.id]: Number(e.target.value)}))}
-                                            className="w-20 p-2 text-right font-bold text-lg text-primary bg-background rounded-md border border-border"
-                                            max={q.maxScore || 1}
-                                            min={0}
-                                            step="0.25"
-                                        />
+                                        <div className="flex items-center gap-1">
+                                            <input 
+                                                type="number"
+                                                value={editedScores[q.id] ?? 0}
+                                                onChange={e => setEditedScores(prev => ({...prev, [q.id]: Number(e.target.value)}))}
+                                                className="w-16 p-2 text-right font-black text-base text-primary bg-background rounded-md border border-border focus:ring-2 focus:ring-primary/20"
+                                                max={q.maxScore || 1}
+                                                min={0}
+                                                step="0.25"
+                                            />
+                                            <span className="text-xs font-bold text-muted-foreground">/{q.maxScore || 1}</span>
+                                        </div>
                                      ) : (
-                                        <span className={`font-bold text-lg px-3 py-1 rounded-full ${isCorrect ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                            {feedbackItem?.score ?? 0}
-                                        </span>
+                                        <div className="text-right">
+                                            <span className={`font-black text-xl ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                                                {feedbackItem?.score ?? 0}
+                                            </span>
+                                            <span className="text-xs font-bold text-muted-foreground">/{q.maxScore || 1}đ</span>
+                                        </div>
                                      )}
-                                     <span className="font-semibold text-muted-foreground">/ {q.maxScore || 1} điểm</span>
                                 </div>
                             </div>
                         </div>
@@ -314,9 +328,9 @@ const ReadingComprehensionResult: React.FC<{
                 );
             })}
              {isEditing && (
-                <div className="flex justify-end gap-4 pt-4 border-t border-border">
-                    <button onClick={handleCancel} disabled={isPending} className="btn-secondary px-6 py-2">Hủy</button>
-                    <button onClick={handleSave} disabled={isPending} className="btn-primary px-6 py-2">
+                <div className="flex justify-end gap-4 pt-4 border-t border-border sticky bottom-4 bg-background p-4 rounded-xl shadow-2xl z-20">
+                    <button onClick={handleCancel} disabled={isPending} className="btn-secondary px-8 py-2.5">Hủy</button>
+                    <button onClick={handleSave} disabled={isPending} className="btn-primary px-8 py-2.5 shadow-md">
                          {isPending ? 'Đang lưu...' : 'Lưu thay đổi'}
                     </button>
                 </div>
@@ -327,17 +341,22 @@ const ReadingComprehensionResult: React.FC<{
 
 
 export default function SubmissionResultPage({ params }: { params: { submissionId: string } }) {
-    const { submissions, problems, users, currentUser, updateSubmission, isLoading } = useDataContext();
+    const { submissions, problems, users, currentUser, updateSubmission, isLoading, refetchData } = useDataContext();
     const router = useRouter();
+    const [isRegrading, setIsRegrading] = useState(false);
 
     const submission = submissions.find(s => s.id === params.submissionId);
 
     if (isLoading) {
-        return <div className="container mx-auto p-8 text-center">Đang tải kết quả...</div>;
+        return (
+            <div className="container mx-auto p-20 text-center">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-primary mx-auto mb-4"></div>
+                <p className="font-bold text-muted-foreground">Đang tải kết quả chấm bài...</p>
+            </div>
+        );
     }
 
     if (!submission || !currentUser) {
-        // Let notFound handle it, or redirect if not found
         notFound();
         return null;
     }
@@ -350,8 +369,8 @@ export default function SubmissionResultPage({ params }: { params: { submissionI
 
     const problem = problems.find(p => p.id === submission.problemId);
     const submitter = users.find(u => u.id === submission.submitterId);
+    const isTeacherOrAdmin = currentUser.role === 'teacher' || currentUser.role === 'admin';
     
-    // FIX: Retrieve all submissions for the same problem to pass to the history component, not just from the current user.
     const historySubmissions = submissions
         .filter(s => s.problemId === submission.problemId && s.submitterId === submission.submitterId)
         .sort((a, b) => a.submittedAt - b.submittedAt);
@@ -360,15 +379,61 @@ export default function SubmissionResultPage({ params }: { params: { submissionI
         return <div className="container mx-auto p-8 text-center">Không thể tải dữ liệu bài nộp.</div>;
     }
 
+    const handleSingleRegrade = async () => {
+        if (!isTeacherOrAdmin || isRegrading) return;
+        setIsRegrading(true);
+        try {
+            await regradeSelectedSubmissions(problem.id, [submission.id]);
+            await refetchData();
+        } catch (error) {
+            alert("Lỗi khi chấm lại bài này. Vui lòng kiểm tra kết nối AI.");
+        } finally {
+            setIsRegrading(false);
+            router.refresh();
+        }
+    };
+
     return (
         <div className="container mx-auto px-4 py-8 max-w-7xl">
-            <Link href={`/problems/${problem.id}`} className="mb-6 text-primary font-semibold hover:underline inline-block">
-                &larr; Quay lại bài tập "{problem.title}"
-            </Link>
-            <header className="mb-10 text-center">
-                <h1 className="text-4xl font-bold text-foreground">Kết quả chấm bài</h1>
-                <p className="text-muted-foreground mt-2">
-                    Nộp bởi <strong>{submitter.displayName}</strong> vào lúc {new Date(submission.submittedAt).toLocaleString('vi-VN')}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                <Link href={`/problems/${problem.id}`} className="text-primary font-black flex items-center gap-2 hover:underline">
+                    &larr; Quay lại bài tập "{problem.title}"
+                </Link>
+                
+                {isTeacherOrAdmin && (
+                    <button 
+                        onClick={handleSingleRegrade}
+                        disabled={isRegrading}
+                        className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-black text-sm transition-all shadow-md active:scale-95 ${
+                            isRegrading 
+                            ? 'bg-muted text-muted-foreground cursor-not-allowed' 
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                        }`}
+                        title="Dùng AI chấm lại duy nhất bài này"
+                    >
+                        {isRegrading ? (
+                            <>
+                                <ArrowPathIcon className="h-4 w-4 animate-spin" />
+                                Đang chấm lại...
+                            </>
+                        ) : (
+                            <>
+                                <ArrowPathIcon className="h-4 w-4" />
+                                Chấm lại bài này
+                            </>
+                        )}
+                    </button>
+                )}
+            </div>
+
+            <header className="mb-10 text-center animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="inline-block px-4 py-1.5 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest rounded-full mb-3">
+                    Kết quả nộp bài
+                </div>
+                <h1 className="text-4xl font-black text-foreground mb-2">Báo cáo đánh giá</h1>
+                <p className="text-muted-foreground font-medium">
+                    Học sinh: <span className="text-foreground font-bold">{submitter.displayName}</span> • 
+                    Nộp lúc {new Date(submission.submittedAt).toLocaleString('vi-VN')}
                 </p>
             </header>
 
@@ -376,38 +441,49 @@ export default function SubmissionResultPage({ params }: { params: { submissionI
                 {/* Main Content */}
                 <div className="lg:col-span-2 space-y-8">
                     {problem.type === 'essay' && (
-                         <div className="bg-card p-6 rounded-xl border border-border">
-                            <h2 className="text-2xl font-bold text-foreground mb-4">Bài làm của học sinh</h2>
-                            <div className="prose prose-slate max-w-none text-foreground/90 whitespace-pre-wrap">{submission.essay}</div>
+                         <div className="bg-card p-8 rounded-2xl border border-border shadow-sm">
+                            <h2 className="text-2xl font-black text-foreground mb-6 flex items-center gap-3">
+                                <div className="h-8 w-1 bg-primary rounded-full"></div>
+                                Bài làm của học sinh
+                            </h2>
+                            <div className="prose prose-slate max-w-none text-foreground/90 whitespace-pre-wrap leading-relaxed italic border-l-4 border-muted/50 pl-6 py-2">
+                                {submission.essay}
+                            </div>
                         </div>
                     )}
                     
-                    {problem.type === 'essay' ? (
-                        <EssayResult 
-                            submission={submission} 
-                            problem={problem} 
-                            currentUser={currentUser}
-                            onUpdateSubmission={updateSubmission}
-                        />
-                    ) : (
-                         <ReadingComprehensionResult 
-                            problem={problem}
-                            submission={submission}
-                            currentUser={currentUser}
-                            onUpdateSubmission={updateSubmission}
-                        />
-                    )}
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 delay-200">
+                        {problem.type === 'essay' ? (
+                            <EssayResult 
+                                submission={submission} 
+                                problem={problem} 
+                                currentUser={currentUser}
+                                onUpdateSubmission={updateSubmission}
+                            />
+                        ) : (
+                             <ReadingComprehensionResult 
+                                problem={problem}
+                                submission={submission}
+                                currentUser={currentUser}
+                                onUpdateSubmission={updateSubmission}
+                            />
+                        )}
+                    </div>
                 </div>
 
                 {/* Sidebar */}
                 <div className="lg:col-span-1 space-y-8">
                      {submission.similarityCheck && problem.type === 'essay' && (
-                        <SimilarityCheckDisplay similarityCheck={submission.similarityCheck} />
+                        <div className="animate-in fade-in slide-in-from-right-4 duration-500 delay-300">
+                            <SimilarityCheckDisplay similarityCheck={submission.similarityCheck} />
+                        </div>
                      )}
-                     <SubmissionHistory 
-                        submissions={historySubmissions} 
-                        currentSubmissionId={submission.id}
-                     />
+                     <div className="animate-in fade-in slide-in-from-right-4 duration-500 delay-400">
+                        <SubmissionHistory 
+                            submissions={historySubmissions} 
+                            currentSubmissionId={submission.id}
+                        />
+                     </div>
                 </div>
             </main>
         </div>
