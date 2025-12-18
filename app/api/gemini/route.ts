@@ -1,3 +1,4 @@
+
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { 
@@ -9,7 +10,6 @@ import {
     smartExtractProblemOnServer,
     distributeReadingAnswersOnServer,
     parseRubricOnServer,
-    // FIX: Added missing import for imageToTextOnServer to resolve "Cannot find name 'imageToTextOnServer'" error.
     imageToTextOnServer
 } from '@/lib/gemini';
 import type { Submission } from '@/types';
@@ -18,6 +18,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { action, payload } = body;
+
+    console.log(`[AI_API] Executing action: ${action}`);
 
     if (action === 'test_connection') {
         const result = await testConnectionOnServer();
@@ -131,6 +133,9 @@ export async function POST(request: Request) {
 
     if (action === 'image_to_text') {
         const { base64Image } = payload;
+        if (!base64Image) {
+            return NextResponse.json({ error: "No image data provided" }, { status: 400 });
+        }
         const text = await imageToTextOnServer(base64Image);
         return NextResponse.json(text);
     }
@@ -155,7 +160,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error) {
-    console.error("Error in Gemini API route:", error);
+    console.error("[AI_API_ERROR]", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
     return NextResponse.json({ error: "Failed to process AI request.", details: errorMessage }, { status: 500 });
   }

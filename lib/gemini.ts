@@ -18,7 +18,9 @@ async function retryOperation<T>(operation: () => Promise<T>, maxRetries: number
             return await operation();
         } catch (error: any) {
             lastError = error;
-            const isOverloaded = error.status === 503 || error.code === 503 || (error.message && (error.message.includes('overloaded') || error.message.includes('UNAVAILABLE')));
+            console.error(`AI Attempt ${attempt} failed:`, error.message || error);
+            
+            const isOverloaded = error.status === 503 || error.code === 503 || (error.message && (error.message.includes('overloaded') || error.message.includes('UNAVAILABLE') || error.message.includes('Resource has been exhausted')));
             if (isOverloaded && attempt < maxRetries) {
                 const delay = initialDelay * Math.pow(2, attempt);
                 await new Promise(resolve => setTimeout(resolve, delay));
@@ -77,7 +79,7 @@ const smartExtractSchema = {
     type: Type.OBJECT,
     properties: {
         type: { type: Type.STRING, enum: ["essay", "reading_comprehension"], description: "Xác định đây là bài văn nghị luận hay bài đọc hiểu." },
-        title: { type: Type.STRING, description: "Tiêu đề phù hợp for bài tập." },
+        title: { type: Type.STRING, description: "Tiêu đề phù hợp cho bài tập." },
         essayData: {
             type: Type.OBJECT,
             properties: {
@@ -297,11 +299,20 @@ export async function parseRubricOnServer(rawRubricText: string): Promise<Omit<R
 
 export async function imageToTextOnServer(base64Image: string): Promise<string> {
     checkApiKey();
+    // Using gemini-2.5-flash-latest for multimodal Vision tasks as it's highly optimized for OCR.
     const response: GenerateContentResponse = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: { parts: [{ inlineData: { mimeType: "image/jpeg", data: base64Image } }, { text: "Trích xuất văn bản từ hình ảnh này, giữ nguyên định dạng." }] }
+        model: "gemini-2.5-flash-latest",
+        contents: { 
+            parts: [
+                { inlineData: { mimeType: "image/jpeg", data: base64Image } }, 
+                { text: "Hãy đọc chữ viết trong hình ảnh này và chuyển nó thành văn bản thuần túy. Nếu là bài văn, hãy giữ nguyên các dấu ngắt đoạn. Chỉ trả về văn bản đã trích xuất, không thêm bình luận." }
+            ] 
+        }
     }));
-    return response.text || "";
+    
+    const text = response.text;
+    if (!text) throw new Error("AI không tìm thấy chữ viết trong ảnh hoặc không thể đọc được.");
+    return text;
 }
 
 export async function checkSimilarityOnServer(currentEssay: string, existingEssays: string[]): Promise<SimilarityCheckResult> {
