@@ -1,13 +1,14 @@
 
 'use client';
-import React, { useState, useTransition } from 'react';
+import React, { useState, useTransition, useRef } from 'react';
 import type { Problem, User, Answer, Submission } from '@/types';
-import { gradeReadingComprehension, distributeReadingAnswers } from '@/services/geminiService';
+import { gradeReadingComprehension, distributeReadingAnswers, getTextFromImage } from '@/services/geminiService';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ErrorMessage from '@/components/ErrorMessage';
 import EssayScanner from '@/components/EssayScanner';
 import CameraIcon from '@/components/icons/CameraIcon';
 import SparklesIcon from '@/components/icons/SparklesIcon';
+import UploadIcon from '@/components/icons/UploadIcon';
 
 interface ReadingComprehensionSolverProps {
   problem: Problem;
@@ -24,11 +25,13 @@ const ReadingComprehensionSolver: React.FC<ReadingComprehensionSolverProps> = ({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [questionIdToScan, setQuestionIdToScan] = useState<string | 'batch' | null>(null);
 
-  // New state for batch answer distribution
+  // Batch answer states
   const [rawAnswersInput, setRawAnswersInput] = useState('');
   const [isDistributing, setIsDistributing] = useState(false);
+  const [isOcrLoading, setIsOcrLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const isLoading = isGrading || isPending || isDistributing;
+  const isLoading = isGrading || isPending || isDistributing || isOcrLoading;
   const questions = problem.questions || [];
 
   const handleOptionChange = (questionId: string, optionId: string) => {
@@ -42,6 +45,34 @@ const ReadingComprehensionSolver: React.FC<ReadingComprehensionSolverProps> = ({
   const handleScanClick = (id: string | 'batch') => {
       setQuestionIdToScan(id);
       setIsScannerOpen(true);
+  };
+
+  const handleUploadClick = () => {
+    setQuestionIdToScan('batch');
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsOcrLoading(true);
+    setError(null);
+    try {
+        const reader = new FileReader();
+        const base64Promise = new Promise<string>((resolve) => {
+            reader.onload = () => resolve((reader.result as string).split(',')[1]);
+            reader.readAsDataURL(file);
+        });
+        const base64 = await base64Promise;
+        const text = await getTextFromImage(base64);
+        setRawAnswersInput(prev => prev ? `${prev}\n\n${text}` : text);
+    } catch (err) {
+        setError(err instanceof Error ? err.message : 'Lỗi khi nhận diện hình ảnh.');
+    } finally {
+        setIsOcrLoading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleTextExtracted = (text: string) => {
@@ -61,7 +92,7 @@ const ReadingComprehensionSolver: React.FC<ReadingComprehensionSolverProps> = ({
     try {
         const distributed = await distributeReadingAnswers(rawAnswersInput, questions);
         setAnswers(prev => ({ ...prev, ...distributed }));
-        setRawAnswersInput(''); // Clear input after successful distribution
+        setRawAnswersInput(''); 
     } catch (err) {
         setError(err instanceof Error ? err.message : 'Lỗi khi phân tách câu trả lời.');
     } finally {
@@ -116,34 +147,63 @@ const ReadingComprehensionSolver: React.FC<ReadingComprehensionSolverProps> = ({
       <div className="space-y-8">
         {/* Quick Submit AI Section */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200 shadow-sm">
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                 <div>
                     <h3 className="text-lg font-bold text-blue-800 flex items-center gap-2 mb-1">
                         <SparklesIcon className="h-5 w-5" />
                         Nộp nhanh bằng AI
                     </h3>
                     <p className="text-sm text-blue-700">
-                        Quét ảnh hoặc dán toàn bộ câu trả lời để AI tự động điền vào các ô.
+                        Chụp ảnh hoặc tải tệp lên để AI tự động điền các ô.
                     </p>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => handleScanClick('batch')}
-                    disabled={isLoading}
-                    className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 font-bold rounded-lg border border-blue-200 shadow-sm hover:bg-blue-50 transition-all disabled:opacity-50"
-                >
-                    <CameraIcon className="h-5 w-5" />
-                    Quét toàn bộ bài
-                </button>
+                <div className="flex gap-2 w-full sm:w-auto">
+                    <button
+                        type="button"
+                        onClick={() => handleScanClick('batch')}
+                        disabled={isLoading}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-white text-blue-600 font-bold rounded-lg border border-blue-200 shadow-sm hover:bg-blue-50 transition-all disabled:opacity-50"
+                    >
+                        <CameraIcon className="h-5 w-5" />
+                        Chụp ảnh
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleUploadClick}
+                        disabled={isLoading}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-white text-blue-600 font-bold rounded-lg border border-blue-200 shadow-sm hover:bg-blue-50 transition-all disabled:opacity-50"
+                    >
+                        <UploadIcon className="h-5 w-5" />
+                        Tải ảnh
+                    </button>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        onChange={handleFileChange} 
+                        accept="image/*" 
+                        className="hidden" 
+                    />
+                </div>
             </div>
             
-            <textarea
-                value={rawAnswersInput}
-                onChange={e => setRawAnswersInput(e.target.value)}
-                placeholder="Nội dung đã quét hoặc dán vào đây (Ví dụ: 1.A, 2.B, Câu 3. Trả lời...)"
-                className="w-full h-32 p-4 bg-white border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-slate-800"
-                disabled={isLoading}
-            />
+            <div className="relative">
+                <textarea
+                    value={rawAnswersInput}
+                    onChange={e => setRawAnswersInput(e.target.value)}
+                    placeholder="Dán nội dung hoặc nộp ảnh bài làm..."
+                    className="w-full h-32 p-4 bg-white border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-slate-800"
+                    disabled={isLoading}
+                />
+                {isOcrLoading && (
+                    <div className="absolute inset-0 bg-white/60 flex items-center justify-center rounded-lg">
+                        <div className="flex flex-col items-center gap-2">
+                             <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+                             <span className="text-sm font-bold text-blue-800">Đang đọc ảnh...</span>
+                        </div>
+                    </div>
+                )}
+            </div>
+            
             <button
                 type="button"
                 onClick={handleAutoDistribute}
