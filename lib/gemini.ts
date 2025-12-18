@@ -195,10 +195,6 @@ const gradingResponseSchema = {
     required: ["detailedFeedback", "totalScore", "maxScore", "generalSuggestions"],
 };
 
-/**
- * FIX: Added optional 'example' parameter to gradeEssayOnServer to handle few-shot grading 
- * requested by the API route logic, solving the 'Expected 5 arguments, but got 6' error.
- */
 export async function gradeEssayOnServer(
     prompt: string, 
     essay: string, 
@@ -212,9 +208,8 @@ export async function gradeEssayOnServer(
     
     let promptContent = `Đề bài: ${prompt}\n\nBài làm: ${essay}\n\nBiểu điểm: ${rawRubric || JSON.stringify(rubric)}\n\nQuy đổi về thang điểm ${maxScoreNum}.`;
     
-    // Use example for few-shot learning if provided to guide the model's grading style
     if (example) {
-        promptContent = `Dưới đây là một ví dụ về bài làm đã được giáo viên chấm điểm trước đó để làm tiêu chuẩn tham khảo:
+        promptContent = `Dưới đây là một ví dụ về bài làm đã được giáo viên chấm điểm trước đó để làm tiêu chuẩn tham khảo về phong cách chấm:
 Ví dụ bài làm:
 """
 ${example.essay}
@@ -224,17 +219,20 @@ Ví dụ kết quả chấm (JSON):
 ${JSON.stringify(example.feedback)}
 
 ---
-Dựa trên phong cách và độ khắt khe của ví dụ trên, hãy chấm bài làm sau đây:
-${promptContent}`;
+Dựa trên phong cách của ví dụ trên, nhưng PHẢI TUÂN THỦ NGHIÊM NGẶT BIỂU ĐIỂM, hãy chấm bài làm sau đây:
+${promptContent}
+
+Lưu ý: Không được tự ý nâng điểm nếu bài làm thực tế không xứng đáng dựa trên tiêu chí, kể cả khi ví dụ mẫu có điểm cao.`;
     }
 
     const response: GenerateContentResponse = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: promptContent,
         config: {
-            systemInstruction: "Bạn là giáo viên chấm bài văn. Phân tích dựa trên biểu điểm và trả về JSON chi tiết. Nếu có bài ví dụ đi kèm, hãy đảm bảo tính nhất quán về mức độ đánh giá.",
+            systemInstruction: "Bạn là giáo viên chấm bài văn khách quan và khắt khe. Phân tích dựa trên biểu điểm và trả về JSON chi tiết. Nếu có bài ví dụ đi kèm, chỉ sử dụng nó để tham khảo mức độ chi tiết của nhận xét, không được dùng để thay đổi tiêu chuẩn chấm điểm.",
             responseMimeType: "application/json",
             responseSchema: gradingResponseSchema,
+            temperature: 0.2,
         }
     }));
     const json = extractJson(response.text);

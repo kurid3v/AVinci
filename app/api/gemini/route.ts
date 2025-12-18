@@ -26,25 +26,34 @@ export async function POST(request: Request) {
 
     if (action === 'grade') {
       const { problemId, prompt, essay, rubric, rawRubric, customMaxScore } = payload;
+      
+      // Get all existing submissions for this problem to find a reference example
       const allSubmissions = await db.all.submissions;
       const existingSubmissions = allSubmissions.filter(s => s.problemId === problemId && s.essay);
       const existingEssays = existingSubmissions.map(s => s.essay).filter(Boolean) as string[];
+
+      // IMPORTANT: Only use teacher-edited submissions as examples to prevent "AI score inflation"
+      // If we use AI's own high scores as reference, it creates a bias loop.
       let bestExample: Submission | null = null;
       const teacherEditedSubmissions = existingSubmissions.filter(s => s.lastEditedByTeacherAt);
+      
       if (teacherEditedSubmissions.length > 0) {
+          // Use the most recently edited teacher feedback as the gold standard
           bestExample = teacherEditedSubmissions.reduce((prev, current) => 
               (new Date(prev.lastEditedByTeacherAt!) > new Date(current.lastEditedByTeacherAt!)) ? prev : current
           );
-      } else if (existingSubmissions.length > 0) {
-          bestExample = existingSubmissions.reduce((prev, current) => 
-              ( (prev.feedback as any).totalScore > (current.feedback as any).totalScore) ? prev : current
-          );
       }
+      
+      // We explicitly skip using the highest AI score if no teacher has reviewed anything.
+      // This ensures grading remains objective based on the rubric alone unless guided by a human.
+      
       const examplePayload = bestExample ? { essay: bestExample.essay!, feedback: bestExample.feedback as any } : undefined;
+      
       const [feedback, similarityCheck] = await Promise.all([
         gradeEssayOnServer(prompt, essay, rubric, rawRubric, customMaxScore, examplePayload),
         checkSimilarityOnServer(essay, existingEssays)
       ]);
+      
       return NextResponse.json({ feedback, similarityCheck });
     }
     
