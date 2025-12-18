@@ -1,6 +1,21 @@
 
 import type { Feedback, RubricItem, Problem, Answer, SimilarityCheckResult, Question } from '@/types';
 
+export interface SmartExtractResult {
+    type: 'essay' | 'reading_comprehension';
+    title: string;
+    essayData?: {
+        prompt: string;
+        rawRubric: string;
+        rubricItems: Omit<RubricItem, 'id'>[];
+        customMaxScore: number;
+    };
+    readingCompData?: {
+        passage: string;
+        questions: Omit<Question, 'id'>[];
+    };
+}
+
 async function callApi<T>(action: string, payload: unknown): Promise<T> {
   const response = await fetch('/api/gemini', {
     method: 'POST',
@@ -18,7 +33,6 @@ async function callApi<T>(action: string, payload: unknown): Promise<T> {
             errorMessage = errorData.error;
         }
     } catch (e) {
-        // Fallback if response is not JSON
         const textBody = await response.text();
         if (textBody) errorMessage = textBody;
     }
@@ -43,7 +57,7 @@ export async function gradeEssay(problemId: string, prompt: string, essay: strin
     return await callApi<{ feedback: Feedback, similarityCheck: SimilarityCheckResult }>('grade', { problemId, prompt, essay, rubric, rawRubric, customMaxScore });
   } catch (error) {
     console.error("Error in gradeEssay service:", error);
-    throw error; // Propagate the actual error message
+    throw error;
   }
 }
 
@@ -59,8 +73,7 @@ export async function gradeReadingComprehension(problem: Problem, answers: Answe
 export async function parseRubric(rawRubricText: string): Promise<Omit<RubricItem, 'id'>[]> {
   try {
     return await callApi<Omit<RubricItem, 'id'>[]>('parseRubric', { rawRubricText });
-  } catch (error)
-{
+  } catch (error) {
     console.error("Error in parseRubric service:", error);
     throw error;
   }
@@ -68,12 +81,20 @@ export async function parseRubric(rawRubricText: string): Promise<Omit<RubricIte
 
 export async function getTextFromImage(base64Image: string): Promise<string> {
   try {
-    // The API route will return a JSON-encoded string, which callApi will parse.
     return await callApi<string>('image_to_text', { base64Image });
   } catch (error) {
     console.error("Error in getTextFromImage service:", error);
     throw error;
   }
+}
+
+export async function smartExtractProblem(rawContent: string): Promise<SmartExtractResult> {
+    try {
+        return await callApi<SmartExtractResult>('smart_extract', { rawContent });
+    } catch (error) {
+        console.error("Error in smartExtractProblem service:", error);
+        throw error;
+    }
 }
 
 export async function extractReadingComprehension(rawContent: string): Promise<{ passage: string; questions: Omit<Question, 'id'>[] }> {

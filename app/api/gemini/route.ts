@@ -8,7 +8,8 @@ import {
     imageToTextOnServer,
     checkSimilarityOnServer,
     testConnectionOnServer,
-    extractReadingComprehensionOnServer
+    extractReadingComprehensionOnServer,
+    smartExtractProblemOnServer
 } from '@/lib/gemini';
 import type { Submission } from '@/types';
 
@@ -24,38 +25,25 @@ export async function POST(request: Request) {
 
     if (action === 'grade') {
       const { problemId, prompt, essay, rubric, rawRubric, customMaxScore } = payload;
-      
       const allSubmissions = await db.all.submissions;
       const existingSubmissions = allSubmissions.filter(s => s.problemId === problemId && s.essay);
       const existingEssays = existingSubmissions.map(s => s.essay).filter(Boolean) as string[];
-
-      // New logic to find the best example:
-      // Prioritize the most recently teacher-edited submission.
-      // Fallback to the highest-scored submission if none have been edited.
       let bestExample: Submission | null = null;
       const teacherEditedSubmissions = existingSubmissions.filter(s => s.lastEditedByTeacherAt);
-
       if (teacherEditedSubmissions.length > 0) {
-          // If there are teacher-edited submissions, pick the most recently edited one.
           bestExample = teacherEditedSubmissions.reduce((prev, current) => 
               (new Date(prev.lastEditedByTeacherAt!) > new Date(current.lastEditedByTeacherAt!)) ? prev : current
           );
       } else if (existingSubmissions.length > 0) {
-          // As a fallback, if no submissions have been edited by a teacher,
-          // use the one with the highest score.
           bestExample = existingSubmissions.reduce((prev, current) => 
               ( (prev.feedback as any).totalScore > (current.feedback as any).totalScore) ? prev : current
           );
       }
-
       const examplePayload = bestExample ? { essay: bestExample.essay!, feedback: bestExample.feedback as any } : undefined;
-
-      // Run grading and similarity check in parallel for efficiency
       const [feedback, similarityCheck] = await Promise.all([
         gradeEssayOnServer(prompt, essay, rubric, rawRubric, customMaxScore, examplePayload),
         checkSimilarityOnServer(essay, existingEssays)
       ]);
-      
       return NextResponse.json({ feedback, similarityCheck });
     }
     
@@ -83,8 +71,13 @@ export async function POST(request: Request) {
         return NextResponse.json(result);
     }
 
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    if (action === 'smart_extract') {
+        const { rawContent } = payload;
+        const result = await smartExtractProblemOnServer(rawContent);
+        return NextResponse.json(result);
+    }
 
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error) {
     console.error("Error in Gemini API route:", error);
     const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
