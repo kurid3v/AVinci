@@ -105,12 +105,3 @@ export async function extractReadingComprehension(rawContent: string): Promise<{
         throw error;
     }
 }
-
-export async function splitStudentAnswers(problem: Problem, rawWork: string): Promise<Answer[]> {
-    try {
-        return await callApi<Answer[]>('split_answers', { problem, rawWork });
-    } catch (error) {
-        console.error("Error in splitStudentAnswers service:", error);
-        throw error;
-    }
-}
