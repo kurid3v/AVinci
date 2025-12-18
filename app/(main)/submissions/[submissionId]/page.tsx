@@ -20,7 +20,9 @@ const EssayResult: React.FC<{
     problem: Problem,
     currentUser: Omit<User, 'password'>,
     onUpdateSubmission: (submissionId: string, updatedData: Partial<Submission>) => Promise<void>;
-}> = ({ submission, problem, currentUser, onUpdateSubmission }) => {
+    onRegrade: () => Promise<void>;
+    isRegrading: boolean;
+}> = ({ submission, problem, currentUser, onUpdateSubmission, onRegrade, isRegrading }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editedFeedback, setEditedFeedback] = useState<Feedback>(submission.feedback);
     const [isPending, startTransition] = useTransition();
@@ -141,13 +143,24 @@ const EssayResult: React.FC<{
     return (
         <div className="relative">
             {isTeacherOrAdmin && (
-                <button 
-                    onClick={() => setIsEditing(true)}
-                    className="absolute -top-14 right-0 btn-outline px-4 py-2 text-sm flex items-center gap-2 border-primary/20 text-primary hover:bg-primary/5 font-bold"
-                >
-                    <PencilIcon className="h-4 w-4" />
-                    Chỉnh sửa điểm & nhận xét
-                </button>
+                <div className="absolute -top-14 right-0 flex gap-2">
+                    <button 
+                        onClick={onRegrade}
+                        disabled={isRegrading}
+                        className={`btn-outline px-4 py-2 text-sm flex items-center gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold transition-all ${isRegrading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title="Dùng AI chấm lại bài này"
+                    >
+                        <ArrowPathIcon className={`h-4 w-4 ${isRegrading ? 'animate-spin' : ''}`} />
+                        {isRegrading ? 'Đang chấm lại...' : 'Chấm lại bằng AI'}
+                    </button>
+                    <button 
+                        onClick={() => setIsEditing(true)}
+                        className="btn-outline px-4 py-2 text-sm flex items-center gap-2 border-primary/20 text-primary hover:bg-primary/5 font-bold"
+                    >
+                        <PencilIcon className="h-4 w-4" />
+                        Chỉnh sửa điểm & nhận xét
+                    </button>
+                </div>
             )}
             <FeedbackDisplay feedback={submission.feedback} problem={problem} />
         </div>
@@ -160,7 +173,9 @@ const ReadingComprehensionResult: React.FC<{
     submission: Submission,
     currentUser: Omit<User, 'password'>,
     onUpdateSubmission: (submissionId: string, updatedData: Partial<Submission>) => Promise<void>;
-}> = ({ problem, submission, currentUser, onUpdateSubmission }) => {
+    onRegrade: () => Promise<void>;
+    isRegrading: boolean;
+}> = ({ problem, submission, currentUser, onUpdateSubmission, onRegrade, isRegrading }) => {
     const questions: Question[] = problem.questions || [];
     const [isEditing, setIsEditing] = useState(false);
     const [editedScores, setEditedScores] = useState<{ [questionId: string]: number }>({});
@@ -236,10 +251,20 @@ const ReadingComprehensionResult: React.FC<{
             <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-black text-foreground">Chi tiết câu trả lời</h2>
                 {isTeacherOrAdmin && !isEditing && (
-                    <button onClick={() => setIsEditing(true)} className="btn-outline px-4 py-2 text-sm flex items-center gap-2 border-primary/20 text-primary hover:bg-primary/5 font-bold">
-                        <PencilIcon className="h-4 w-4" />
-                        Chỉnh sửa điểm & nhận xét
-                    </button>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={onRegrade}
+                            disabled={isRegrading}
+                            className={`btn-outline px-4 py-2 text-sm flex items-center gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 font-bold transition-all ${isRegrading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                            <ArrowPathIcon className={`h-4 w-4 ${isRegrading ? 'animate-spin' : ''}`} />
+                            {isRegrading ? 'Đang chấm lại...' : 'Chấm lại bằng AI'}
+                        </button>
+                        <button onClick={() => setIsEditing(true)} className="btn-outline px-4 py-2 text-sm flex items-center gap-2 border-primary/20 text-primary hover:bg-primary/5 font-bold">
+                            <PencilIcon className="h-4 w-4" />
+                            Chỉnh sửa điểm & nhận xét
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -459,6 +484,8 @@ export default function SubmissionResultPage({ params }: { params: { submissionI
                                 problem={problem} 
                                 currentUser={currentUser}
                                 onUpdateSubmission={updateSubmission}
+                                onRegrade={handleSingleRegrade}
+                                isRegrading={isRegrading}
                             />
                         ) : (
                              <ReadingComprehensionResult 
@@ -466,6 +493,8 @@ export default function SubmissionResultPage({ params }: { params: { submissionI
                                 submission={submission}
                                 currentUser={currentUser}
                                 onUpdateSubmission={updateSubmission}
+                                onRegrade={handleSingleRegrade}
+                                isRegrading={isRegrading}
                             />
                         )}
                     </div>
