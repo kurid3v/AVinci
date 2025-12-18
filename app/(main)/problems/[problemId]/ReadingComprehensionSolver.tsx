@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useTransition, useRef } from 'react';
 import type { Problem, User, Answer, Submission } from '@/types';
@@ -29,6 +28,7 @@ const ReadingComprehensionSolver: React.FC<ReadingComprehensionSolverProps> = ({
   const [rawAnswersInput, setRawAnswersInput] = useState('');
   const [isDistributing, setIsDistributing] = useState(false);
   const [isOcrLoading, setIsOcrLoading] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isLoading = isGrading || isPending || isDistributing || isOcrLoading;
@@ -53,35 +53,34 @@ const ReadingComprehensionSolver: React.FC<ReadingComprehensionSolverProps> = ({
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     setIsOcrLoading(true);
     setError(null);
+    // FIX: Explicitly cast to File[] to resolve 'unknown' type inference issues on some environments.
+    const fileArray = Array.from(files) as File[];
+    
     try {
-        const reader = new FileReader();
-        const base64Promise = new Promise<string>((resolve) => {
-            reader.onload = () => resolve((reader.result as string).split(',')[1]);
-            reader.readAsDataURL(file);
-        });
-        const base64 = await base64Promise;
-        const text = await getTextFromImage(base64);
-        setRawAnswersInput(prev => prev ? `${prev}\n\n${text}` : text);
+        const results = await Promise.all(fileArray.map(async (file, index) => {
+            setOcrProgress(`Đang đọc ảnh ${index + 1}/${fileArray.length}...`);
+            const reader = new FileReader();
+            const base64Promise = new Promise<string>((resolve) => {
+                reader.onload = () => resolve((reader.result as string).split(',')[1]);
+                reader.readAsDataURL(file);
+            });
+            const base64 = await base64Promise;
+            return await getTextFromImage(base64);
+        }));
+
+        const combinedText = results.join('\n\n---\n\n');
+        setRawAnswersInput(prev => prev ? `${prev}\n\n${combinedText}` : combinedText);
     } catch (err) {
         setError(err instanceof Error ? err.message : 'Lỗi khi nhận diện hình ảnh.');
     } finally {
         setIsOcrLoading(false);
+        setOcrProgress(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const handleTextExtracted = (text: string) => {
-    if (questionIdToScan === 'batch') {
-      setRawAnswersInput(prev => prev ? `${prev}\n\n${text}` : text);
-    } else if (questionIdToScan) {
-      const currentAnswer = answers[questionIdToScan]?.writtenAnswer || '';
-      const newAnswer = currentAnswer ? `${currentAnswer}\n\n${text}` : text;
-      handleTextChange(questionIdToScan, newAnswer);
     }
   };
 
@@ -97,6 +96,16 @@ const ReadingComprehensionSolver: React.FC<ReadingComprehensionSolverProps> = ({
         setError(err instanceof Error ? err.message : 'Lỗi khi phân tách câu trả lời.');
     } finally {
         setIsDistributing(false);
+    }
+  };
+
+  const handleTextExtracted = (text: string) => {
+    if (questionIdToScan === 'batch') {
+      setRawAnswersInput(prev => prev ? `${prev}\n\n${text}` : text);
+    } else if (questionIdToScan) {
+      const currentAnswer = answers[questionIdToScan]?.writtenAnswer || '';
+      const newAnswer = currentAnswer ? `${currentAnswer}\n\n${text}` : text;
+      handleTextChange(questionIdToScan, newAnswer);
     }
   };
 
@@ -154,7 +163,7 @@ const ReadingComprehensionSolver: React.FC<ReadingComprehensionSolverProps> = ({
                         Nộp nhanh bằng AI
                     </h3>
                     <p className="text-sm text-blue-700">
-                        Chụp ảnh hoặc tải tệp lên để AI tự động điền các ô.
+                        Chụp ảnh hoặc tải nhiều ảnh lên để AI tự động điền các ô.
                     </p>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
@@ -174,13 +183,14 @@ const ReadingComprehensionSolver: React.FC<ReadingComprehensionSolverProps> = ({
                         className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-white text-blue-600 font-bold rounded-lg border border-blue-200 shadow-sm hover:bg-blue-50 transition-all disabled:opacity-50"
                     >
                         <UploadIcon className="h-5 w-5" />
-                        Tải ảnh
+                        Tải ảnh (nhiều tệp)
                     </button>
                     <input 
                         type="file" 
                         ref={fileInputRef} 
                         onChange={handleFileChange} 
                         accept="image/*" 
+                        multiple 
                         className="hidden" 
                     />
                 </div>
@@ -195,10 +205,10 @@ const ReadingComprehensionSolver: React.FC<ReadingComprehensionSolverProps> = ({
                     disabled={isLoading}
                 />
                 {isOcrLoading && (
-                    <div className="absolute inset-0 bg-white/60 flex items-center justify-center rounded-lg">
-                        <div className="flex flex-col items-center gap-2">
-                             <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
-                             <span className="text-sm font-bold text-blue-800">Đang đọc ảnh...</span>
+                    <div className="absolute inset-0 bg-white/60 flex items-center justify-center rounded-lg backdrop-blur-[1px]">
+                        <div className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl shadow-xl border border-blue-100">
+                             <div className="animate-spin h-10 w-10 border-4 border-blue-600 border-t-transparent rounded-full"></div>
+                             <span className="text-sm font-bold text-blue-800">{ocrProgress || 'Đang xử lý hình ảnh...'}</span>
                         </div>
                     </div>
                 )}
