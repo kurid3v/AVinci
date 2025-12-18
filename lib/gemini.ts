@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import type { Feedback, RubricItem, Problem, Answer, DetailedFeedbackItem, SimilarityCheckResult } from '@/types';
+import type { Feedback, RubricItem, Problem, Answer, DetailedFeedbackItem, SimilarityCheckResult, Question } from '@/types';
 
 // Initialize with a fallback to avoid build-time errors. 
 // The SDK will throw a runtime error if called without a valid key, which is expected behavior.
@@ -47,10 +47,6 @@ async function retryOperation<T>(operation: () => Promise<T>, maxRetries: number
 
 /**
  * Extracts the first valid JSON object or array from a string.
- * It handles markdown code fences and gracefully ignores any trailing text
- * that might cause parsing errors.
- * @param text The string potentially containing JSON.
- * @returns The extracted JSON string, or null if not found.
  */
 function extractJson(text: string | undefined): string | null {
     if (!text) return null;
@@ -518,4 +514,73 @@ export async function checkSimilarityOnServer(currentEssay: string, existingEssa
          console.error("Error checking similarity:", e);
          return { similarityPercentage: 0, explanation: "Không thể kiểm tra độ tương đồng do lỗi hệ thống.", mostSimilarEssayIndex: -1 };
     }
+}
+
+// --- READING COMPREHENSION EXTRACTION ---
+const extractionResponseSchema = {
+    type: Type.OBJECT,
+    properties: {
+        passage: { type: Type.STRING, description: "Phần văn bản đọc hiểu (đoạn văn/văn bản chính)." },
+        questions: {
+            type: Type.ARRAY,
+            description: "Mảng các câu hỏi được trích xuất.",
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    questionText: { type: Type.STRING, description: "Nội dung câu hỏi." },
+                    questionType: { type: Type.STRING, enum: ["multiple_choice", "short_answer"], description: "Loại câu hỏi." },
+                    maxScore: { type: Type.NUMBER, description: "Điểm số cho câu hỏi này." },
+                    options: {
+                        type: Type.ARRAY,
+                        description: "Danh sách các lựa chọn nếu là trắc nghiệm.",
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                text: { type: Type.STRING, description: "Nội dung lựa chọn." },
+                                isCorrect: { type: Type.BOOLEAN, description: "Lựa chọn này có phải là đáp án đúng không?" }
+                            },
+                            required: ["text", "isCorrect"]
+                        }
+                    },
+                    gradingCriteria: { type: Type.STRING, description: "Đáp án mẫu hoặc tiêu chí chấm cho câu hỏi tự luận ngắn." }
+                },
+                required: ["questionText", "questionType", "maxScore"]
+            }
+        }
+    },
+    required: ["passage", "questions"]
+};
+
+const extractionSystemInstruction = `Bạn là một chuyên gia soạn đề thi Ngữ văn. Nhiệm vụ của bạn là nhận một khối văn bản thô (gồm đoạn văn đọc hiểu và các câu hỏi kèm đáp án/biểu điểm) và cấu trúc lại chúng thành định dạng JSON sạch.
+
+QUY TẮC:
+1. **Phân tách**: Xác định đâu là đoạn văn bản chính (passage) và đâu là các câu hỏi.
+2. **Loại câu hỏi**: Phân biệt câu hỏi trắc nghiệm (có các phương án A, B, C, D) và câu hỏi tự luận ngắn (yêu cầu trả lời trực tiếp).
+3. **Đáp án**:
+   - Với trắc nghiệm: Tìm phương án đúng (thường được đánh dấu bằng dấu sao, in đậm, hoặc ghi chú riêng) và đánh dấu 'isCorrect: true'.
+   - Với tự luận: Tìm đáp án mẫu hoặc tiêu chí chấm điểm tương ứng để điền vào 'gradingCriteria'.
+4. **Điểm số**: Trích xuất điểm số cho mỗi câu nếu có. Nếu không ghi, mặc định là 1.0.
+5. **Định dạng**: Trả về duy nhất đối tượng JSON theo schema. Không thêm lời dẫn giải.`;
+
+export async function extractReadingComprehensionOnServer(rawContent: string): Promise<{ passage: string; questions: Omit<Question, 'id'>[] }> {
+    checkApiKey();
+    const content = `Vui lòng trích xuất dữ liệu từ văn bản sau:\n\n"""${rawContent}"""`;
+
+    const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: content,
+        config: {
+            systemInstruction: extractionSystemInstruction,
+            responseMimeType: "application/json",
+            responseSchema: extractionResponseSchema,
+            temperature: 0,
+        },
+    }));
+
+    const jsonText = extractJson(response.text);
+    if (!jsonText) {
+        throw new Error("Không thể trích xuất dữ liệu từ văn bản đã cung cấp.");
+    }
+    
+    return JSON.parse(jsonText);
 }

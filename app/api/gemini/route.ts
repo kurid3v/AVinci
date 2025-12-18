@@ -7,7 +7,8 @@ import {
     gradeReadingComprehensionOnServer, 
     imageToTextOnServer,
     checkSimilarityOnServer,
-    testConnectionOnServer
+    testConnectionOnServer,
+    extractReadingComprehensionOnServer
 } from '@/lib/gemini';
 import type { Submission } from '@/types';
 
@@ -74,6 +75,12 @@ export async function POST(request: Request) {
         const { base64Image } = payload;
         const text = await imageToTextOnServer(base64Image);
         return NextResponse.json(text);
+    }
+
+    if (action === 'extract_reading_comp') {
+        const { rawContent } = payload;
+        const result = await extractReadingComprehensionOnServer(rawContent);
+        return NextResponse.json(result);
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

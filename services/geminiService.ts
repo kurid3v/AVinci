@@ -1,5 +1,5 @@
 
-import type { Feedback, RubricItem, Problem, Answer, SimilarityCheckResult } from '@/types';
+import type { Feedback, RubricItem, Problem, Answer, SimilarityCheckResult, Question } from '@/types';
 
 async function callApi<T>(action: string, payload: unknown): Promise<T> {
   const response = await fetch('/api/gemini', {
@@ -74,4 +74,13 @@ export async function getTextFromImage(base64Image: string): Promise<string> {
     console.error("Error in getTextFromImage service:", error);
     throw error;
   }
+}
+
+export async function extractReadingComprehension(rawContent: string): Promise<{ passage: string; questions: Omit<Question, 'id'>[] }> {
+    try {
+        return await callApi<{ passage: string; questions: Omit<Question, 'id'>[] }>('extract_reading_comp', { rawContent });
+    } catch (error) {
+        console.error("Error in extractReadingComprehension service:", error);
+        throw error;
+    }
 }

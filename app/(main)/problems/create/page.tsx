@@ -6,9 +6,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useDataContext } from '@/context/DataContext';
 import { createProblem } from '@/app/actions';
-import { parseRubric } from '@/services/geminiService';
+import { parseRubric, extractReadingComprehension } from '@/services/geminiService';
 import type { Problem, RubricItem, Question, Option } from '@/types';
 import TrashIcon from '@/components/icons/TrashIcon';
+import SparklesIcon from '@/components/icons/SparklesIcon';
 
 // A sub-component to manage individual questions for reading comprehension
 const QuestionEditor: React.FC<{
@@ -143,6 +144,8 @@ export default function CreateProblemPage() {
     // Reading comprehension state
     const [passage, setPassage] = useState('');
     const [questions, setQuestions] = useState<Question[]>([]);
+    const [isExtractingReadingComp, setIsExtractingReadingComp] = useState(false);
+    const [rawReadingCompInput, setRawReadingCompInput] = useState('');
 
     const [isPending, startTransition] = useTransition();
 
@@ -162,6 +165,45 @@ export default function CreateProblemPage() {
             setError(err instanceof Error ? err.message : "Không thể phân tích biểu điểm.");
         } finally {
             setIsParsingRubric(false);
+        }
+    };
+
+    const handleExtractReadingComp = async () => {
+        if (!rawReadingCompInput.trim()) return;
+        setIsExtractingReadingComp(true);
+        setError('');
+        try {
+            const result = await extractReadingComprehension(rawReadingCompInput);
+            setPassage(result.passage);
+            
+            const structuredQuestions: Question[] = result.questions.map(q => {
+                const id = crypto.randomUUID();
+                const options = q.options?.map(o => ({
+                    id: crypto.randomUUID(),
+                    text: o.text,
+                    isCorrect: (o as any).isCorrect // Use temporary property for mapping
+                }));
+                
+                // @ts-ignore
+                const correctOptionId = options?.find(o => o.isCorrect)?.id;
+
+                return {
+                    id,
+                    questionText: q.questionText,
+                    questionType: q.questionType,
+                    maxScore: q.maxScore,
+                    options: options?.map(({ isCorrect, ...rest }) => rest), // Clean up temporary property
+                    correctOptionId,
+                    gradingCriteria: q.gradingCriteria
+                };
+            });
+            
+            setQuestions(structuredQuestions);
+            setRawReadingCompInput(''); // Clear input after successful extraction
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Lỗi khi trích xuất dữ liệu đọc hiểu.");
+        } finally {
+            setIsExtractingReadingComp(false);
         }
     };
 
@@ -375,6 +417,41 @@ export default function CreateProblemPage() {
                     </div>
                 ) : (
                     <div className="space-y-6">
+                         {/* Smart Extraction Block */}
+                         <div className="bg-primary/5 p-6 rounded-xl border border-primary/20">
+                            <h3 className="text-lg font-bold text-primary flex items-center gap-2 mb-2">
+                                <SparklesIcon className="h-5 w-5" />
+                                Trích xuất câu hỏi thông minh (AI)
+                            </h3>
+                            <p className="text-sm text-muted-foreground mb-4">
+                                Dán nội dung bao gồm cả đoạn văn và các câu hỏi (kèm đáp án/biểu điểm) vào đây. AI sẽ tự động phân tách và điền vào các ô bên dưới.
+                            </p>
+                            <textarea 
+                                value={rawReadingCompInput}
+                                onChange={e => setRawReadingCompInput(e.target.value)}
+                                placeholder="Dán toàn bộ nội dung đề bài và biểu điểm đọc hiểu vào đây..."
+                                className={`h-40 ${inputClass}`}
+                            />
+                            <button 
+                                type="button" 
+                                onClick={handleExtractReadingComp}
+                                disabled={isExtractingReadingComp || !rawReadingCompInput.trim()}
+                                className="mt-3 btn-primary px-4 py-2 text-sm flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {isExtractingReadingComp ? (
+                                    <>
+                                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                                        Đang trích xuất...
+                                    </>
+                                ) : (
+                                    <>
+                                        <SparklesIcon className="h-4 w-4" />
+                                        Bắt đầu trích xuất bằng AI
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
                         <div>
                             <label htmlFor="problem-passage" className={labelClass}>Đoạn văn</label>
                             <textarea id="problem-passage" value={passage} onChange={e => setPassage(e.target.value)} className={`mt-2 h-48 ${inputClass}`} />
@@ -384,7 +461,7 @@ export default function CreateProblemPage() {
                             <div className="mt-2 space-y-4">
                                 {questions.map((q, i) => <QuestionEditor key={q.id} question={q} index={i} onUpdate={handleUpdateQuestion} onRemove={handleRemoveQuestion} />)}
                             </div>
-                            <button type="button" onClick={handleAddQuestion} className="mt-4 btn-secondary px-4 py-2 text-sm">+ Thêm câu hỏi</button>
+                            <button type="button" onClick={handleAddQuestion} className="mt-4 btn-secondary px-4 py-2 text-sm">+ Thêm câu hỏi thủ công</button>
                         </div>
                     </div>
                 )}
