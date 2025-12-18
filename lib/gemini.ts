@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import type { Feedback, RubricItem, Problem, Answer, DetailedFeedbackItem, SimilarityCheckResult } from '@/types';
 
 // Initialize with a fallback to avoid build-time errors. 
@@ -13,6 +13,37 @@ const checkApiKey = () => {
         throw new Error("API Key chưa được cấu hình trên server. Vui lòng kiểm tra biến môi trường GEMINI_API_KEY.");
     }
 };
+
+/**
+ * Helper to retry an async operation with exponential backoff.
+ * Useful for handling 503 Service Unavailable / Overloaded errors from the API.
+ */
+async function retryOperation<T>(operation: () => Promise<T>, maxRetries: number = 3, initialDelay: number = 2000): Promise<T> {
+    let lastError: any;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await operation();
+        } catch (error: any) {
+            lastError = error;
+            // Check for common overload/availability error codes or messages
+            const isOverloaded = 
+                error.status === 503 || 
+                error.code === 503 || 
+                (error.message && (error.message.includes('overloaded') || error.message.includes('UNAVAILABLE')));
+            
+            if (isOverloaded && attempt < maxRetries) {
+                const delay = initialDelay * Math.pow(2, attempt); // Exponential backoff: 2s, 4s, 8s
+                console.warn(`Gemini API overloaded (Attempt ${attempt + 1}/${maxRetries + 1}). Retrying in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                continue;
+            }
+            
+            throw error; // If not retryable or max retries reached
+        }
+    }
+    throw lastError;
+}
 
 /**
  * Extracts the first valid JSON object or array from a string.
@@ -89,10 +120,10 @@ export async function testConnectionOnServer(): Promise<{ success: boolean; mess
     const start = Date.now();
     try {
         checkApiKey();
-        await ai.models.generateContent({
+        await retryOperation(() => ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: "Ping",
-        });
+        }), 1, 1000); // 1 retry for ping
         const latency = Date.now() - start;
         return { success: true, message: "Kết nối đến Google Gemini ổn định.", latency };
     } catch (error) {
@@ -204,7 +235,7 @@ export async function gradeEssayOnServer(
     Bài làm: """${essay}"""
   `.trim();
 
-    const response = await ai.models.generateContent({
+    const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: content,
       config: {
@@ -213,7 +244,7 @@ export async function gradeEssayOnServer(
         responseSchema: gradingResponseSchema,
         temperature: 0,
       },
-    });
+    }));
 
     const jsonText = extractJson(response.text);
     if (!jsonText) {
@@ -264,7 +295,7 @@ export async function parseRubricOnServer(rawRubricText: string): Promise<Omit<R
   checkApiKey();
   const content = `Vui lòng phân tích và trích xuất biểu điểm từ Hướng dẫn chấm sau:\n\n"""${rawRubricText}"""`;
 
-    const response = await ai.models.generateContent({
+    const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: content,
       config: {
@@ -273,7 +304,7 @@ export async function parseRubricOnServer(rawRubricText: string): Promise<Omit<R
         responseSchema: rubricParsingSchema,
         temperature: 0,
       },
-    });
+    }));
 
     const jsonText = extractJson(response.text);
     if (!jsonText) {
@@ -359,7 +390,7 @@ export async function gradeReadingComprehensionOnServer(problem: Problem, answer
             Hãy chấm điểm và đưa ra nhận xét cho từng câu hỏi.
         `;
         
-        const response = await ai.models.generateContent({
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: content,
             config: {
@@ -368,7 +399,7 @@ export async function gradeReadingComprehensionOnServer(problem: Problem, answer
                 responseSchema: readingCompGradingSchema,
                 temperature: 0,
             },
-        });
+        }));
 
         const jsonText = extractJson(response.text);
         if (jsonText) {
@@ -416,7 +447,7 @@ export async function gradeReadingComprehensionOnServer(problem: Problem, answer
 export async function imageToTextOnServer(base64Image: string): Promise<string> {
     checkApiKey();
     try {
-        const response = await ai.models.generateContent({
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
             model: "gemini-2.5-flash", 
             contents: {
                 parts: [
@@ -431,7 +462,7 @@ export async function imageToTextOnServer(base64Image: string): Promise<string> 
                     }
                 ]
             }
-        });
+        }));
         return response.text || "";
     } catch (e) {
         console.error("Error extracting text from image:", e);
@@ -470,7 +501,7 @@ export async function checkSimilarityOnServer(currentEssay: string, existingEssa
 
     try {
         checkApiKey();
-        const response = await ai.models.generateContent({
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: content,
             config: {
@@ -478,7 +509,7 @@ export async function checkSimilarityOnServer(currentEssay: string, existingEssa
                 responseSchema: similarityCheckSchema,
                 temperature: 0,
             }
-        });
+        }));
 
         const jsonText = extractJson(response.text);
         if (!jsonText) return { similarityPercentage: 0, explanation: "Lỗi phân tích kết quả từ AI.", mostSimilarEssayIndex: -1 };

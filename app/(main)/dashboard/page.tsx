@@ -100,7 +100,7 @@ export default function DashboardPage() {
         return (
             <div
                 onClick={() => router.push(`/problems/${problem.id}`)}
-                className="block bg-card p-6 rounded-xl shadow-card hover:shadow-card-hover border border-border transition-all duration-200 cursor-pointer relative group flex flex-col"
+                className="block bg-card p-6 rounded-xl shadow-card hover:shadow-card-hover border border-border transition-all duration-200 cursor-pointer relative group flex flex-col h-full"
             >
                 {(currentUser.role === 'teacher' || currentUser.role === 'admin') && (
                     <button
@@ -114,9 +114,9 @@ export default function DashboardPage() {
                 )}
                 <div className="flex-grow">
                     <div className="flex justify-between items-start gap-4">
-                        <div className="flex-1">
-                            <h3 className="font-bold text-foreground pr-8">{problem.title}</h3>
-                            <p className="text-sm text-muted-foreground mt-1">Giao bởi: {teacher?.displayName || 'Không rõ'}</p>
+                        <div className="flex-1 min-w-0">
+                            <h3 className="font-bold text-foreground pr-8 line-clamp-2" title={problem.title}>{problem.title}</h3>
+                            <p className="text-sm text-muted-foreground mt-1 truncate">Giao bởi: {teacher?.displayName || 'Không rõ'}</p>
                              {problemClassrooms.length > 0 && (
                                 <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground" title={problemClassrooms.map(c => c.name).join(', ')}>
                                     <UsersIcon className="h-4 w-4" />
