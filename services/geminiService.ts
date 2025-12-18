@@ -105,3 +105,12 @@ export async function extractReadingComprehension(rawContent: string): Promise<{
         throw error;
     }
 }
+
+export async function distributeReadingAnswers(rawText: string, questions: Question[]): Promise<{ [questionId: string]: { selectedOptionId?: string, writtenAnswer?: string } }> {
+    try {
+        return await callApi<{ [questionId: string]: { selectedOptionId?: string, writtenAnswer?: string } }>('distribute_answers', { rawText, questions });
+    } catch (error) {
+        console.error("Error in distributeReadingAnswers service:", error);
+        throw error;
+    }
+}

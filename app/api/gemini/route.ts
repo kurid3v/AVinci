@@ -9,7 +9,8 @@ import {
     checkSimilarityOnServer,
     testConnectionOnServer,
     extractReadingComprehensionOnServer,
-    smartExtractProblemOnServer
+    smartExtractProblemOnServer,
+    distributeReadingAnswersOnServer
 } from '@/lib/gemini';
 import type { Submission } from '@/types';
 
@@ -74,6 +75,12 @@ export async function POST(request: Request) {
     if (action === 'smart_extract') {
         const { rawContent } = payload;
         const result = await smartExtractProblemOnServer(rawContent);
+        return NextResponse.json(result);
+    }
+
+    if (action === 'distribute_answers') {
+        const { rawText, questions } = payload;
+        const result = await distributeReadingAnswersOnServer(rawText, questions);
         return NextResponse.json(result);
     }
 

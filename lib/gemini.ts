@@ -78,7 +78,7 @@ const smartExtractSchema = {
     type: Type.OBJECT,
     properties: {
         type: { type: Type.STRING, enum: ["essay", "reading_comprehension"], description: "Xác định đây là bài văn nghị luận hay bài đọc hiểu." },
-        title: { type: Type.STRING, description: "Tiêu đề phù hợp cho bài tập." },
+        title: { type: Type.STRING, description: "Tiêu đề phù hợp for bài tập." },
         essayData: {
             type: Type.OBJECT,
             properties: {
@@ -149,7 +149,6 @@ Trả về kết quả duy nhất là đối tượng JSON theo schema đã cho.
 
 export async function smartExtractProblemOnServer(rawContent: string) {
     checkApiKey();
-    // Fixed: Explicitly type the response to avoid "unknown" type error.
     const response: GenerateContentResponse = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: `Hãy phân tích và cấu trúc lại khối văn bản sau:\n\n"""${rawContent}"""`,
@@ -162,6 +161,37 @@ export async function smartExtractProblemOnServer(rawContent: string) {
     }));
     const jsonText = extractJson(response.text);
     if (!jsonText) throw new Error("Không thể phân tích dữ liệu.");
+    return JSON.parse(jsonText);
+}
+
+// --- BATCH ANSWER DISTRIBUTION ---
+export async function distributeReadingAnswersOnServer(rawText: string, questions: Question[]) {
+    checkApiKey();
+    const systemInstruction = `Bạn là trợ lý học tập. Nhiệm vụ của bạn là nhận một khối văn bản chứa câu trả lời của học sinh cho nhiều câu hỏi khác nhau.
+Bạn cần phân tách văn bản đó và gán từng câu trả lời vào đúng Question ID tương ứng.
+
+DỮ LIỆU ĐẦU VÀO:
+1. Khối văn bản thô từ học sinh.
+2. Danh sách các câu hỏi (ID, nội dung, loại câu hỏi).
+
+YÊU CẦU:
+- Với câu hỏi trắc nghiệm (multiple_choice): Tìm xem học sinh chọn phương án nào (A, B, C, D hoặc nội dung phương án) và trả về 'selectedOptionId' khớp với Option ID trong danh sách.
+- Với câu hỏi tự luận ngắn (short_answer): Trích xuất đoạn văn tương ứng với câu hỏi đó vào 'writtenAnswer'.
+- Trả về một đối tượng JSON ánh xạ: { [questionId: string]: { selectedOptionId?: string, writtenAnswer?: string } }
+
+Hãy cẩn thận với thứ tự câu hỏi (ví dụ Câu 1, Câu 2) hoặc các từ khóa trong đề bài để gán chính xác. Nếu một câu hỏi không có câu trả lời rõ ràng, hãy bỏ qua hoặc để trống.`;
+
+    const response: GenerateContentResponse = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Văn bản học sinh:\n"""${rawText}"""\n\nDanh sách câu hỏi:\n${JSON.stringify(questions)}`,
+        config: {
+            systemInstruction,
+            responseMimeType: "application/json",
+            temperature: 0.1,
+        },
+    }));
+    const jsonText = extractJson(response.text);
+    if (!jsonText) throw new Error("Không thể phân bổ câu trả lời.");
     return JSON.parse(jsonText);
 }
 
@@ -191,7 +221,6 @@ export async function gradeEssayOnServer(prompt: string, essay: string, rubric: 
     };
     const maxScoreNum = Number(customMaxScore) || 10;
     const content = `Đề bài: ${prompt}\n\nBài làm: ${essay}\n\nQuy đổi về thang điểm ${maxScoreNum}.`;
-    // Fixed: Explicitly type the response to avoid "unknown" type error.
     const response: GenerateContentResponse = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: content,
@@ -214,7 +243,6 @@ export async function parseRubricOnServer(rawRubricText: string): Promise<Omit<R
             required: ["criterion", "maxScore"]
         }
     };
-    // Fixed: Explicitly type the response to avoid "unknown" type error.
     const response: GenerateContentResponse = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: rawRubricText,
@@ -235,7 +263,6 @@ export async function gradeReadingComprehensionOnServer(problem: Problem, answer
 
 export async function imageToTextOnServer(base64Image: string): Promise<string> {
     checkApiKey();
-    // Fixed: Explicitly type the response to avoid "unknown" type error.
     const response: GenerateContentResponse = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: { parts: [{ inlineData: { mimeType: "image/jpeg", data: base64Image } }, { text: "Trích xuất văn bản." }] }
@@ -249,7 +276,6 @@ export async function checkSimilarityOnServer(currentEssay: string, existingEssa
 
 export async function extractReadingComprehensionOnServer(rawContent: string): Promise<{ passage: string; questions: Omit<Question, 'id'>[] }> {
     checkApiKey();
-    // Fixed: Explicitly type the response to avoid "unknown" type error.
     const response: GenerateContentResponse = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: rawContent,
