@@ -22,7 +22,7 @@ const ReadingComprehensionSolver: React.FC<ReadingComprehensionSolverProps> = ({
   const [isPending, startTransition] = useTransition();
 
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const [questionIdToScan, setQuestionIdToScan] = useState<string | null>(null);
+  const [questionIdToScan, setQuestionIdToScan] = useState<string | 'batch' | null>(null);
 
   // New state for batch answer distribution
   const [rawAnswersInput, setRawAnswersInput] = useState('');
@@ -39,13 +39,15 @@ const ReadingComprehensionSolver: React.FC<ReadingComprehensionSolverProps> = ({
     setAnswers(prev => ({ ...prev, [questionId]: { ...prev[questionId], writtenAnswer: text } }));
   };
 
-  const handleScanClick = (questionId: string) => {
-      setQuestionIdToScan(questionId);
+  const handleScanClick = (id: string | 'batch') => {
+      setQuestionIdToScan(id);
       setIsScannerOpen(true);
   };
 
   const handleTextExtracted = (text: string) => {
-    if (questionIdToScan) {
+    if (questionIdToScan === 'batch') {
+      setRawAnswersInput(prev => prev ? `${prev}\n\n${text}` : text);
+    } else if (questionIdToScan) {
       const currentAnswer = answers[questionIdToScan]?.writtenAnswer || '';
       const newAnswer = currentAnswer ? `${currentAnswer}\n\n${text}` : text;
       handleTextChange(questionIdToScan, newAnswer);
@@ -114,17 +116,31 @@ const ReadingComprehensionSolver: React.FC<ReadingComprehensionSolverProps> = ({
       <div className="space-y-8">
         {/* Quick Submit AI Section */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200 shadow-sm">
-            <h3 className="text-lg font-bold text-blue-800 flex items-center gap-2 mb-2">
-                <SparklesIcon className="h-5 w-5" />
-                Nộp nhanh bằng AI
-            </h3>
-            <p className="text-sm text-blue-700 mb-4">
-                Dán toàn bộ câu trả lời của bạn vào đây (ví dụ: "Câu 1. A, Câu 2. B..."). AI sẽ tự động phân tách và điền vào từng câu bên dưới.
-            </p>
+            <div className="flex justify-between items-start mb-4">
+                <div>
+                    <h3 className="text-lg font-bold text-blue-800 flex items-center gap-2 mb-1">
+                        <SparklesIcon className="h-5 w-5" />
+                        Nộp nhanh bằng AI
+                    </h3>
+                    <p className="text-sm text-blue-700">
+                        Quét ảnh hoặc dán toàn bộ câu trả lời để AI tự động điền vào các ô.
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    onClick={() => handleScanClick('batch')}
+                    disabled={isLoading}
+                    className="flex items-center gap-2 px-4 py-2 bg-white text-blue-600 font-bold rounded-lg border border-blue-200 shadow-sm hover:bg-blue-50 transition-all disabled:opacity-50"
+                >
+                    <CameraIcon className="h-5 w-5" />
+                    Quét toàn bộ bài
+                </button>
+            </div>
+            
             <textarea
                 value={rawAnswersInput}
                 onChange={e => setRawAnswersInput(e.target.value)}
-                placeholder="Dán bài làm thô vào đây..."
+                placeholder="Nội dung đã quét hoặc dán vào đây (Ví dụ: 1.A, 2.B, Câu 3. Trả lời...)"
                 className="w-full h-32 p-4 bg-white border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-slate-800"
                 disabled={isLoading}
             />
@@ -132,17 +148,17 @@ const ReadingComprehensionSolver: React.FC<ReadingComprehensionSolverProps> = ({
                 type="button"
                 onClick={handleAutoDistribute}
                 disabled={isLoading || !rawAnswersInput.trim()}
-                className="mt-3 flex items-center justify-center gap-2 px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50"
+                className="mt-3 w-full flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-md transition-all disabled:opacity-50"
             >
                 {isDistributing ? (
                     <>
-                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-                        Đang phân tách...
+                        <div className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                        Đang phân tách thông minh...
                     </>
                 ) : (
                     <>
-                        <SparklesIcon className="h-4 w-4" />
-                        Tự động điền câu hỏi
+                        <SparklesIcon className="h-5 w-5" />
+                        Tự động điền tất cả câu hỏi
                     </>
                 )}
             </button>
