@@ -1,5 +1,4 @@
 
-
 export interface User {
   id: string;
   username: string; // for login
@@ -92,6 +91,7 @@ export interface Exam {
   createdBy: string; // userId of teacher
   createdAt: number;
   classroomIds?: string[]; // IDs of classrooms this exam is assigned to
+  isPractice?: boolean; // New: true for "Practice Set", false for "Strict Exam"
 }
 
 export interface ExamAttempt {

@@ -174,6 +174,8 @@ export async function createExam(data: {
   endTime: number;
   password?: string;
   createdBy: string;
+  isPractice?: boolean;
+  classroomIds?: string[];
 }) {
     try {
         const newExam = await db.exams.create(data);

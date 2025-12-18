@@ -18,7 +18,7 @@ interface DataContextType {
     isLoading: boolean;
     updateUserRole: (userId: string, role: 'student' | 'teacher' | 'admin') => Promise<void>;
     updateProblem: (updatedProblem: Problem) => Promise<void>;
-    addExam: (title: string, description: string, startTime: number, endTime: number, password?: string, classroomIds?: string[]) => Promise<Exam | null>;
+    addExam: (title: string, description: string, startTime: number, endTime: number, password?: string, classroomIds?: string[], isPractice?: boolean) => Promise<Exam | null>;
     addSubmissionAndSyncState: (submissionData: Omit<Submission, 'id' | 'submittedAt'>) => Promise<Submission | null>;
     updateSubmission: (submissionId: string, updatedData: Partial<Submission>) => Promise<void>;
     startExamAttempt: (examId: string) => Promise<ExamAttempt | null>;
@@ -127,13 +127,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
-    const addExam = async (title: string, description: string, startTime: number, endTime: number, password?: string, classroomIds?: string[]): Promise<Exam | null> => {
+    const addExam = async (title: string, description: string, startTime: number, endTime: number, password?: string, classroomIds?: string[], isPractice?: boolean): Promise<Exam | null> => {
         if (!currentUser) return null;
         try {
             const response = await fetch('/api/exams', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ title, description, startTime, endTime, password, createdBy: currentUser.id, classroomIds }),
+                body: JSON.stringify({ title, description, startTime, endTime, password, createdBy: currentUser.id, classroomIds, isPractice }),
             });
             if (!response.ok) throw new Error('Failed to create exam');
             const newExam = await response.json();
