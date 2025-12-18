@@ -11,7 +11,6 @@ import CameraIcon from '@/components/icons/CameraIcon';
 import SparklesIcon from '@/components/icons/SparklesIcon';
 import UploadIcon from '@/components/icons/UploadIcon';
 import EssayScanner from '@/components/EssayScanner';
-// Added missing import for LockClosedIcon
 import LockClosedIcon from '@/components/icons/LockClosedIcon';
 
 type AnswersState = { [problemId: string]: string | { [key: string]: { selectedOptionId?: string, writtenAnswer?: string } } };
@@ -199,18 +198,23 @@ export default function ExamTakingPage({ params }: { params: { examId: string; a
 
         setOcrProgress("Đang nhận diện...");
         const fileArray = Array.from(files) as File[];
+        const results: string[] = [];
         
         try {
-            const results = await Promise.all(fileArray.map(async (file, idx) => {
-                setOcrProgress(`Đang xử lý ảnh ${idx + 1}/${fileArray.length}...`);
-                const reader = new FileReader();
-                const base64Promise = new Promise<string>((resolve) => {
+            // Process sequentially to respect AI rate limits
+            for (let i = 0; i < fileArray.length; i++) {
+                const file = fileArray[i];
+                setOcrProgress(`Đang xử lý ảnh ${i + 1}/${fileArray.length}...`);
+                
+                const base64 = await new Promise<string>((resolve) => {
+                    const reader = new FileReader();
                     reader.onload = () => resolve((reader.result as string).split(',')[1]);
                     reader.readAsDataURL(file);
                 });
-                const base64 = await base64Promise;
-                return await getTextFromImage(base64);
-            }));
+
+                const text = await getTextFromImage(base64);
+                results.push(text);
+            }
 
             const combinedText = results.join('\n\n---\n\n');
             if (problem.type === 'essay') {

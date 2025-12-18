@@ -299,9 +299,9 @@ export async function parseRubricOnServer(rawRubricText: string): Promise<Omit<R
 
 export async function imageToTextOnServer(base64Image: string): Promise<string> {
     checkApiKey();
-    // Using gemini-2.5-flash-latest for multimodal Vision tasks as it's highly optimized for OCR.
+    // Use gemini-3-flash-preview for high quality multimodal OCR.
     const response: GenerateContentResponse = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-        model: "gemini-2.5-flash-latest",
+        model: "gemini-3-flash-preview",
         contents: { 
             parts: [
                 { inlineData: { mimeType: "image/jpeg", data: base64Image } }, 
