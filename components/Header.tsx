@@ -5,7 +5,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useSession } from '@/context/SessionContext';
 import type { User } from '../types';
 import UserCircleIcon from './icons/UserCircleIcon';
-import BookOpenIcon from './icons/BookOpenIcon';
 
 interface HeaderProps {
   user: Omit<User, 'password'>;
