@@ -1,16 +1,16 @@
-
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { 
     gradeEssayOnServer, 
-    parseRubricOnServer, 
     gradeReadingComprehensionOnServer, 
-    imageToTextOnServer,
     checkSimilarityOnServer,
     testConnectionOnServer,
     extractReadingComprehensionOnServer,
     smartExtractProblemOnServer,
-    distributeReadingAnswersOnServer
+    distributeReadingAnswersOnServer,
+    parseRubricOnServer,
+    // FIX: Added missing import for imageToTextOnServer to resolve "Cannot find name 'imageToTextOnServer'" error.
+    imageToTextOnServer
 } from '@/lib/gemini';
 import type { Submission } from '@/types';
 
@@ -50,19 +50,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ feedback, similarityCheck });
     }
     
-    // Optimized Regrade All action to ensure consistent reference example for the entire batch
-    if (action === 'regrade_all') {
-        const { problemId } = payload;
+    if (action === 'regrade_all' || action === 'regrade_selected') {
+        const { problemId, submissionIds } = payload;
         const problem = (await db.all.problems).find(p => p.id === problemId);
         if (!problem) return NextResponse.json({ error: 'Problem not found' }, { status: 404 });
 
         const allSubmissions = await db.all.submissions;
-        const problemSubmissions = allSubmissions.filter(s => s.problemId === problemId);
-        const existingEssays = problemSubmissions.map(s => s.essay).filter(Boolean) as string[];
+        let problemSubmissions = allSubmissions.filter(s => s.problemId === problemId);
+        
+        // If specific IDs are provided, filter by them
+        if (action === 'regrade_selected' && Array.isArray(submissionIds)) {
+            problemSubmissions = problemSubmissions.filter(s => submissionIds.includes(s.id));
+        }
+
+        const existingEssays = (await db.all.submissions)
+            .filter(s => s.problemId === problemId)
+            .map(s => s.essay)
+            .filter(Boolean) as string[];
 
         // Find reference example once for the whole batch
         let bestExample: Submission | null = null;
-        const teacherEditedSubmissions = problemSubmissions.filter(s => s.lastEditedByTeacherAt);
+        const teacherEditedSubmissions = (await db.all.submissions)
+            .filter(s => s.problemId === problemId && s.lastEditedByTeacherAt);
+            
         if (teacherEditedSubmissions.length > 0) {
             bestExample = teacherEditedSubmissions.reduce((prev, current) => 
                 (new Date(prev.lastEditedByTeacherAt!) > new Date(current.lastEditedByTeacherAt!)) ? prev : current

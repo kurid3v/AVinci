@@ -70,6 +70,15 @@ export async function regradeAllProblemSubmissions(problemId: string): Promise<{
     }
 }
 
+export async function regradeSelectedSubmissions(problemId: string, submissionIds: string[]): Promise<{ success: boolean; updatedCount: number }> {
+    try {
+        return await callApi<{ success: boolean; updatedCount: number }>('regrade_selected', { problemId, submissionIds });
+    } catch (error) {
+        console.error("Error in regradeSelectedSubmissions service:", error);
+        throw error;
+    }
+}
+
 export async function gradeReadingComprehension(problem: Problem, answers: Answer[]): Promise<Feedback> {
   try {
     return await callApi<Feedback>('grade_reading_comprehension', { problem, answers });
