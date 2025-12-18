@@ -1,6 +1,4 @@
 
-
-
 'use client';
 import React, { useState, useTransition } from 'react';
 import type { Submission, Problem, User } from '@/types';
@@ -71,6 +69,9 @@ const StudentGraderView: React.FC<StudentGraderViewProps> = ({ problem, user, on
 
   const handleTextExtracted = (text: string) => {
     setEssay(prev => prev ? `${prev}\n\n${text}` : text);
+    // Smoothly scroll to the textarea after extraction
+    const textarea = document.getElementById('essay-input');
+    textarea?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
   return (

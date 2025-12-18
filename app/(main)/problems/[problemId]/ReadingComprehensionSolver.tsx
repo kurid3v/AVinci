@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useTransition, useRef } from 'react';
 import type { Problem, User, Answer, Submission } from '@/types';
@@ -58,7 +59,6 @@ const ReadingComprehensionSolver: React.FC<ReadingComprehensionSolverProps> = ({
 
     setIsOcrLoading(true);
     setError(null);
-    // FIX: Explicitly cast to File[] to resolve 'unknown' type inference issues on some environments.
     const fileArray = Array.from(files) as File[];
     
     try {
@@ -279,7 +279,7 @@ const ReadingComprehensionSolver: React.FC<ReadingComprehensionSolverProps> = ({
                                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-secondary text-secondary-foreground font-semibold rounded-md hover:bg-muted transition-colors disabled:opacity-50"
                             >
                                 <CameraIcon className="h-4 w-4" />
-                                Quét bài giấy
+                                Quét bài giấy (Nhiều ảnh)
                             </button>
                         </div>
                         <textarea
