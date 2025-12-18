@@ -6,8 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useSession } from '@/context/SessionContext';
 import type { User } from '../types';
 import UserCircleIcon from './icons/UserCircleIcon';
-import ChartBarIcon from './icons/ChartBarIcon';
-import BookOpenIcon from './icons/BookOpenIcon'; // Assuming you might want an icon, reusing BookOpen for now or import another
+import BookOpenIcon from './icons/BookOpenIcon';
 
 interface HeaderProps {
   user: Omit<User, 'password'>;
@@ -47,7 +46,6 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
     );
   };
   
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -70,7 +68,6 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
                 <NavLink href="/exams">Đề thi</NavLink>
                 <NavLink href="/classrooms">Lớp học</NavLink>
                 <NavLink href="/submissions/all">Bài nộp</NavLink>
-                <NavLink href="/statistics" icon={<ChartBarIcon className="h-4 w-4" />}>Thống kê</NavLink>
                 <NavLink href="/system-design">Hệ thống</NavLink>
                 {user.role === 'admin' && (
                     <NavLink href="/admin">Quản trị</NavLink>
@@ -105,9 +102,6 @@ const Header: React.FC<HeaderProps> = ({ user }) => {
                 </div>
                 <Link href="/profile" onClick={() => setIsDropdownOpen(false)} className="block px-4 py-2 text-sm text-foreground hover:bg-muted">
                   Hồ sơ của tôi
-                </Link>
-                <Link href="/statistics" onClick={() => setIsDropdownOpen(false)} className="sm:hidden block px-4 py-2 text-sm text-foreground hover:bg-muted">
-                  Thống kê dự án
                 </Link>
                 <Link href="/system-design" onClick={() => setIsDropdownOpen(false)} className="sm:hidden block px-4 py-2 text-sm text-foreground hover:bg-muted">
                   Sơ đồ hệ thống
