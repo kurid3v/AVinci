@@ -116,7 +116,7 @@ const QuestionEditor: React.FC<{
 
 const EditProblemForm: React.FC<{ problem: Problem }> = ({ problem }) => {
     const router = useRouter();
-    const { currentUser, classrooms } = useDataContext();
+    const { currentUser, classrooms, refetchData } = useDataContext();
 
     const [problemType, setProblemType] = useState(problem.type);
     const [title, setTitle] = useState(problem.title);
@@ -242,15 +242,12 @@ const EditProblemForm: React.FC<{ problem: Problem }> = ({ problem }) => {
         startTransition(async () => {
             try {
                 await updateProblem(problem.id, problemData);
+                await refetchData(); // Cập nhật lại context để hiển thị dữ liệu mới ngay lập tức
                 router.push(`/problems/${problem.id}`);
             } catch (err) {
                 setError(err instanceof Error ? err.message : "Đã có lỗi xảy ra.");
             }
         });
-    };
-
-    const handleClassroomToggle = (classId: string) => {
-        setSelectedClassroomIds(prev => prev.includes(classId) ? prev.filter(id => id !== classId) : [...prev, classId]);
     };
 
     const inputClass = "w-full p-3 bg-background border border-border rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-ring/50";
@@ -289,18 +286,54 @@ const EditProblemForm: React.FC<{ problem: Problem }> = ({ problem }) => {
                                 <textarea id="problem-prompt" value={prompt} onChange={e => setPrompt(e.target.value)} className={`mt-2 h-32 ${inputClass}`} />
                             </div>
                             <div>
-                                <label htmlFor="problem-rubric" className={labelClass}>Hướng dẫn chấm</label>
-                                <textarea id="problem-rubric" value={rawRubric} onChange={e => setRawRubric(e.target.value)} className={`mt-2 h-40 ${inputClass}`} />
+                                <label htmlFor="problem-rubric" className={labelClass}>Hướng dẫn chấm (Biểu điểm)</label>
+                                <textarea id="problem-rubric" value={rawRubric} onChange={e => setRawRubric(e.target.value)} className={`mt-2 h-40 ${inputClass}`} placeholder="Dán biểu điểm chi tiết vào đây..." />
                                 <button type="button" onClick={handleParseRubric} disabled={isParsingRubric} className="mt-2 btn-secondary px-4 py-2 text-sm disabled:opacity-50">
                                     {isParsingRubric ? 'Đang phân tích...' : 'Phân tích biểu điểm bằng AI'}
                                 </button>
-                                {/* Rubric table omitted for brevity, same as create page */}
+                                <div className="mt-4 border border-border rounded-lg overflow-hidden">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-secondary">
+                                            <tr>
+                                                <th className="p-3 text-left">Luận điểm</th>
+                                                <th className="p-3 text-right w-36">Điểm tối đa</th>
+                                                <th className="p-3 w-10"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {rubricItems.map((item, index) => (
+                                                <tr key={item.id} className="border-t border-border">
+                                                    <td className="p-2">
+                                                        <input type="text" value={item.criterion} onChange={e => handleRubricChange(index, 'criterion', e.target.value)} className="w-full p-2 bg-transparent border-none focus:ring-0" placeholder="Tiêu chí..." />
+                                                    </td>
+                                                    <td className="p-2">
+                                                        <input type="number" value={item.maxScore} onChange={e => handleRubricChange(index, 'maxScore', Number(e.target.value))} className="w-full p-2 bg-transparent border-none text-right font-bold focus:ring-0" step="0.25" />
+                                                    </td>
+                                                    <td className="p-2">
+                                                        <button type="button" onClick={() => handleDeleteRubricItem(index)} className="text-muted-foreground hover:text-destructive"><TrashIcon /></button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                    <button type="button" onClick={handleAddRubricItem} className="w-full p-3 bg-secondary/30 hover:bg-secondary text-primary font-semibold border-t">+ Thêm tiêu chí mới</button>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label htmlFor="problem-max-score" className={labelClass}>Thang điểm quy đổi</label>
+                                    <input id="problem-max-score" type="number" value={customMaxScore} onChange={e => setCustomMaxScore(Number(e.target.value))} className={`mt-2 ${inputClass}`} min="1" step="0.5" />
+                                </div>
+                                <div className="flex items-center gap-3 pt-8">
+                                    <input id="problem-hide-rubric" type="checkbox" checked={isRubricHidden} onChange={e => setIsRubricHidden(e.target.checked)} className="h-5 w-5 rounded form-checkbox text-primary focus:ring-primary"/>
+                                    <label htmlFor="problem-hide-rubric" className="font-medium">Ẩn biểu điểm với học sinh</label>
+                                </div>
                             </div>
                         </div>
                     ) : (
                         <div className="space-y-6">
                             <div>
-                                <label htmlFor="problem-passage" className={labelClass}>Đoạn văn</label>
+                                <label htmlFor="problem-passage" className={labelClass}>Đoạn văn / Ngữ liệu</label>
                                 <textarea id="problem-passage" value={passage} onChange={e => setPassage(e.target.value)} className={`mt-2 h-48 ${inputClass}`} />
                             </div>
                             <div>
