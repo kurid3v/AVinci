@@ -103,13 +103,18 @@ const EssayScanner: React.FC<EssayScannerProps> = ({ isOpen, onClose, onTextExtr
                 setMode('preview');
             }
         };
-        reader.readAsDataURL(files[0]);
+        // Fixed: Explicitly handle files[0] and cast to Blob to resolve 'unknown' error
+        const file = files[0];
+        if (file) {
+          reader.readAsDataURL(file as Blob);
+        }
     } else {
         // Multiple files behavior: start batch OCR immediately
         setMode('loading');
         setError(null);
         const results: string[] = [];
-        const fileArray = Array.from(files);
+        // Fixed: Cast Array.from(files) to File[] to ensure the loop variable is properly typed
+        const fileArray = Array.from(files) as File[];
 
         try {
             for (let i = 0; i < fileArray.length; i++) {
@@ -119,7 +124,8 @@ const EssayScanner: React.FC<EssayScannerProps> = ({ isOpen, onClose, onTextExtr
                 const base64 = await new Promise<string>((resolve) => {
                     const reader = new FileReader();
                     reader.onload = () => resolve((reader.result as string).split(',')[1]);
-                    reader.readAsDataURL(file);
+                    // Fixed: Pass file as Blob
+                    reader.readAsDataURL(file as Blob);
                 });
 
                 const text = await getTextFromImage(base64);
